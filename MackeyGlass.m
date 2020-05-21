@@ -124,14 +124,8 @@ classdef MackeyGlass
             M_x = M_x(2:end,:);      % Delete the first row of initial conditions
             
             t = 400;
-            plot(M_x);
+%             plot(M_x);
         end
-        
-        
-%         function D_x = MGDDE23(obj);
-%             % Calculates reservoir state using DDE23 
-%             
-%         end
         
         
         function sol = dde23Comp(obj,input)
@@ -141,7 +135,7 @@ classdef MackeyGlass
             % Where Z is the the delayed x, x is the current x and t is the
             % current time.
             J = input;      %Possibility of multiplying against the nodes like above to compare node performace?
-            J = [J ; 0]
+            J = [J ; 0];
             inlen = size(input,1);
             
             tau = obj.theta .* obj.N;
@@ -157,8 +151,28 @@ classdef MackeyGlass
 
             sol = dde23(dx, tau, hist, t);
 
-            plot(sol.x,sol.y);
+%             plot(sol.x,sol.y);
             
+        end
+        
+        
+        function diff = ddeEulerComp(obj, input)
+            
+            eulerSol = obj.MGEulerComp(input);
+            ddeSol = obj.dde23Comp(input);
+            error = ddeSol.y - eulerSol;
+            size(error)
+%             plot(ddeSol.x, error);
+            subplot(1,2,1);
+
+            plot(ddeSol.x,ddeSol.y);
+            title("DDE23")
+            subplot(1,2,2);
+            plot(eulerSol);
+            title("Euler")
+            
+            
+            diff = mean(mean(error,1),1)
         end
     
     end
