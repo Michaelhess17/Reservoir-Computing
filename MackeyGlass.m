@@ -12,6 +12,8 @@ classdef MackeyGlass
     end
     
     methods
+        
+        
         function obj = MackeyGlass(N,eta,gamma,theta,loops,p)
             %Constructor of an instance of MackeyGlass Class
             %{
@@ -28,8 +30,9 @@ classdef MackeyGlass
             obj.gamma = gamma;
             obj.theta = theta;
             obj.loops = loops;
-            obj.p = o;
+            obj.p = p;
         end
+        
         
         function maskedInput = mask(obj, input, varargin)
             % Takes and applies specific mask to input
@@ -57,7 +60,6 @@ classdef MackeyGlass
             end
         end
         
-
         
         function M_x = MGEuler(obj,input, mask)
             % Calculates the value of each point using euler method
@@ -81,7 +83,7 @@ classdef MackeyGlass
                 for j = 2:obj.N   % Evaluates the nodes other than first value
                     vn = M_x(i,j - 1) + (- M_x(i, j - 1) + ...
                         self.eta * ( M_x(i - 1 , j - 1) + obj.gamma .* J(i,j-1) ...
-                        ./ (1 + (M_x(i-1, j - 1) + obj.gamma .* J(i, j - 1)).^ obj.p ) .* obj.theta;
+                        ./ (1 + (M_x(i-1, j - 1) + obj.gamma .* J(i, j - 1)).^ obj.p ) .* obj.theta)) ;
                     M_x(i, j) = vn;
                 end
             end
@@ -90,8 +92,75 @@ classdef MackeyGlass
         
         function outputArg = MGDDE23;
             
-        end 
+        end
         
+        
+        function M_x = MGEulerComp(obj,input)
+            % Calculates output of MG using euler WITHOUT
+            % RESERVOIR/Masking
+%                   - Possibility of upgrading this code to handle multiple loops
+            % M_x: Matrix of reservoir history
+            
+            J = input * ones(1 , obj.N);
+            cycles = size(input);   %The number of rows we have
+            M_x = zeros(cycles(1), obj.N);  
+            J = [zeros(1,obj.N); J];    % Sets initial Value to 0
+            
+            for i = 2:cycles+1
+                for j = 0       %Used to evaluate MG for the first value in a new column
+                    vn_0 = M_x(i-1,end) + (- M_x(i-1,end) + obj.eta .* (M_x(i-1,end) + ...
+                            obj.gamma .* J(i-1,end)) ./ (1 + (M_x(i-1,end) + obj.gamma ...
+                            .* J(i-1,end)).^ obj.p)) .* obj.theta;
+                    M_x(i,1) = vn_0;
+                end
+                        
+                for j = 2:obj.N   % Evaluates the nodes other than first value
+                    vn = M_x(i,j - 1) + (- M_x(i, j - 1) + ...
+                        obj.eta * ( M_x(i - 1 , j - 1) + obj.gamma .* J(i,j-1) ...
+                        ./ (1 + (M_x(i-1, j - 1) + obj.gamma .* J(i, j - 1)).^ obj.p ) .* obj.theta));
+                    M_x(i, j) = vn;
+                end
+            end
+            M_x = M_x(2:end,:);      % Delete the first row of initial conditions
+            
+            t = 400;
+            plot(M_x);
+        end
+        
+        
+%         function D_x = MGDDE23(obj);
+%             % Calculates reservoir state using DDE23 
+%             
+%         end
+        
+        
+        function sol = dde23Comp(obj,input)
+            % Calculates (Without masking) state of the reservoir using
+            % DDE 23
+            %
+            % Where Z is the the delayed x, x is the current x and t is the
+            % current time.
+            J = input;      %Possibility of multiplying against the nodes like above to compare node performace?
+            J = [J ; 0]
+            inlen = size(input,1);
+            
+            tau = obj.theta .* obj.N;
+            hist = 0;
+            
+            % Edit the way that you iterate through the inputs, its sloppy
+            dx = @(t,x,XL) ( obj.eta .* ( XL + obj.gamma .* J(round(t ./ tau)+1) ) ...
+                ./ ( 1 + (XL + obj.gamma .* J(round(t ./ tau)+1)) ) ) - x;
+
+            duration = inlen .* tau;
+            t = linspace(0,duration,inlen);
+            hist = 0;
+
+            sol = dde23(dx, tau, hist, t);
+
+            plot(sol.x,sol.y);
+            
+        end
+    
     end
 end
 
