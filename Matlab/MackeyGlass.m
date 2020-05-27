@@ -156,23 +156,44 @@ classdef MackeyGlass
         end
         
         
-        function diff = ddeEulerComp(obj, input)
+        function diff = ddeVEuler(obj, input)
+            % ddeVEuler compares the accuracy of Euler method of integration
+            % to method of steps (dde23)
+            
+            % args:
+            % input = vertical array of input values
+            
+            % returns:
+            % squared error between the two methods.
             
             eulerSol = obj.MGEulerComp(input);
             ddeSol = obj.dde23Comp(input);
-            error = ddeSol.y - eulerSol;
-            size(error)
-%             plot(ddeSol.x, error);
-            subplot(1,2,1);
-
+            error = eulerSol - ddeSol.y;
+            
+            SqError = error .^ 2;
+            size(error);
+            
+            diff = mean(mean(SqError,1),2);
+            
+            % Plot it all out
+            figure1 = figure
+            
+            subplot(2,2,1);
             plot(ddeSol.x,ddeSol.y);
             title("DDE23")
-            subplot(1,2,2);
-            plot(eulerSol);
+            
+            subplot(2,2,2);
+            plot(linspace(0,size(input,1).* obj.theta, size(input,1)) ,eulerSol);
             title("Euler")
             
+            subplot(2,2,3)
+            plot(linspace(0,size(input,1).* obj.theta, size(input,1)), SqError);
+            title("squared error")
             
-            diff = mean(mean(error,1),1)
+            saveas(figure1,'EulervDDE23.png')
+            
+           fprintf('Squared Total Error = %f1.2',diff);
+           
         end
     
     end
