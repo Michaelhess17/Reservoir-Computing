@@ -143,7 +143,7 @@ classdef MackeyGlass
             
             % Edit the way that you iterate through the inputs, its sloppy
             dx = @(t,x,XL) ( obj.eta .* ( XL + obj.gamma .* J(round(t ./ tau)+1) ) ...
-                ./ ( 1 + (XL + obj.gamma .* J(round(t ./ tau)+1)) ) ) - x;
+                ./ ( 1 + (XL + obj.gamma .* J(round(t ./ tau)+1)) ) .^ obj.p ) - x;
 
             duration = inlen .* tau;
             t = linspace(0,duration,inlen);
