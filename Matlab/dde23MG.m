@@ -1,5 +1,5 @@
-function sol = dde23MG(tau)
-    % Solves Mackey-Glass with DDE23; chaning tau
+function soy = dde23MG(tau)
+    % Solves Mackey-Glass with DDE23; changing tau and returns y outputs.
     %
     % Where Z is the the delayed x, x is the current x, t is the
     % current time and XL is the output of the system tau time ago.
@@ -19,8 +19,7 @@ function sol = dde23MG(tau)
 
     hist = 0.5;
     sol = dde23(dx, tau, hist, t);
-
-    plot(sol.x,sol.y);
+    soy = sol.y;
 
 end
 
