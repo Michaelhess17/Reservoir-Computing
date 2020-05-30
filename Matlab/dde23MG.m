@@ -13,13 +13,14 @@ function soy = dde23MG(tau)
     % Edit the way that you iterate through the inputs, its sloppy
     dx = @(t,x,XL)  eta .* ( XL ./ ( 1 + XL .^ n) ) - (gamma .* x);
 
-    iter = 20;
+    iter = 300;
     duration = iter .* tau;        % how many tau cycles do you want?
     t = linspace(0,duration,iter);
 
     hist = 0.5;
     sol = dde23(dx, tau, hist, t);
     soy = sol.y;
+
 
 end
 

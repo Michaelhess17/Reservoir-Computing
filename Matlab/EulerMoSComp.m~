@@ -21,9 +21,10 @@
 
 % END OF TESTS
 
- d = ddeVEuler(0.400750375187594,2,false);
+% d = ddeVEuler(0.0970,2,false);
 
 
+clear
 
 % % 0.000001 -> 0.1
 % testRange = linspace(0.000001,0.1,200);
@@ -39,19 +40,19 @@
 % ylabel("squared error");
 % title("error for different euler integration steps")
 
-% % 0.1 -> ~5
-% testRange = linspace(0.01,1,2000);
-% counter = 1;
-% 
-% for n = testRange
-%     spError(counter) = ddeVEuler(n,2,false);
-%     counter = counter +1;
-% end
-% 
-% plot(testRange(:), spError);
-% xlabel("Integration Step");
-% ylabel("squared error");
-% title("error for different euler integration steps")
+%
+testRange = linspace(0.000001,0.1,200);
+counter = 1;
+
+for n = testRange
+    spError(counter) = ddeVEuler(n,2,false);
+    counter = counter +1;
+end
+
+plot(testRange(:), spError);
+xlabel("Integration Step");
+ylabel("squared error");
+title("error for different euler integration steps")
 
 function [eulert, M_x] = MGEulerComp( tau, eta, p, gamma, iterations, theta, initial)
     % Calculates output of MG using euler 
