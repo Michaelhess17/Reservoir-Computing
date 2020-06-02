@@ -21,7 +21,7 @@
 
     %% TEST Comparison Functions
 
-    % d = ddeVEuler(0.01,2,false);
+%     d = ddeVEuler(0.02,2,false);
 
 %     d = ddeVEuler(0.01,2,true);
 
@@ -51,37 +51,37 @@
     % title("error for different euler integration steps")
 
     %% 2000 points between 0.00001 -> 1
-      
-    NumofSteps = 8000;
-    min = 0.00001;
-    max = 1;
-    testRange = linspace(min,max, NumofSteps);
-    counter = 1;
-    tau = 2;
-
-    for n = testRange
-        [spError(counter), eta, p, gamma, iterations, initial, spTime(counter)] = ddeVEuler(n,tau,false);
-        counter = counter +1;
-    end
-    
-    subplot(2,1,1);
-    plot(testRange(:), spError);
-    xlabel("Integration Step");
-    ylabel("Squared error");
-    title("squared error over "+ num2str(NumofSteps) + " euler integration steps from " + num2str(min) + " to " + num2str(max))
-    a = gca;
-    a.Position(3) = 0.60;
-    annotation( 'textbox', ...
-        [ 0.75, 0.85, 0.1, 0.1], 'String', ["dx = -gamma * x(t) + eta *(x(t-tau)/ (1 + x(t-tau) ** p))" , "eta=" + num2str(eta)  "p =" + num2str(p) "gamma=" + num2str(gamma)...
-         "Iterations of tau = " + num2str(iterations)  "Initialvalue = " + num2str(initial)...
-         "tau =" + num2str(tau)]);
-     
-    subplot(2,1,2);
-    plot(testRange(:), spTime);
-    b = gca;
-    b.Position(3) = 0.6;
-    xlabel("Integration Step");
-    ylabel("time(s) needed for Euler computation");
+%       
+%     NumofSteps = 8000;
+%     min = 0.00001;
+%     max = 1;
+%     testRange = linspace(min,max, NumofSteps);
+%     counter = 1;
+%     tau = 2;
+% 
+%     for n = testRange
+%         [spError(counter), eta, p, gamma, iterations, initial, spTime(counter)] = ddeVEuler(n,tau,false);
+%         counter = counter +1;
+%     end
+%     
+%     subplot(2,1,1);
+%     plot(testRange(:), spError);
+%     xlabel("Integration Step");
+%     ylabel("Squared error");
+%     title("squared error over "+ num2str(NumofSteps) + " euler integration steps from " + num2str(min) + " to " + num2str(max))
+%     a = gca;
+%     a.Position(3) = 0.60;
+%     annotation( 'textbox', ...
+%         [ 0.75, 0.85, 0.1, 0.1], 'String', ["dx = -gamma * x(t) + eta *(x(t-tau)/ (1 + x(t-tau) ** p))" , "eta=" + num2str(eta)  "p =" + num2str(p) "gamma=" + num2str(gamma)...
+%          "Iterations of tau = " + num2str(iterations)  "Initialvalue = " + num2str(initial)...
+%          "tau =" + num2str(tau)]);
+%      
+%     subplot(2,1,2);
+%     plot(testRange(:), spTime);
+%     b = gca;
+%     b.Position(3) = 0.6;
+%     xlabel("Integration Step");
+%     ylabel("time(s) needed for Euler computation");
 
    
 
@@ -118,8 +118,24 @@
 %     xlabel("Integration Step");
 %     ylabel("time(s) needed for Euler computation");
 
-   
-
+%% Compare the graphs of different peaks and mins around the end of p = 7
+% Near the lower limits of eta = 2, p = 7, gamma = 1, iterations of tau =
+    % 200, initialvalue = 1.3, tau = 2, we see a bunch of oscillationsin
+    % the squared error. We want to plot some solutions of the max and dips of int steps there
+    
+% Find and pluck some of the peaks/min
+    tau = 2;
+    theta = 0.1053;     %peak plucked from "Eulervdde8000p7.fig"
+    figure(1);
+    [spError, eta, p, gamma, iterations, initial, spTime] = ddeVEuler(theta,tau,true);
+    
+    theta = 0.104;     %dip plucked from "Eulervdde8000p7.fig"
+    figure(2);
+    [spError, eta, p, gamma, iterations, initial, spTime] = ddeVEuler(theta,tau,true);
+    
+    theta = 1.00e-05;   % Most accurate choice of integration step for comparision.
+    figure(3);
+    [spError, eta, p, gamma, iterations, initial, spTime] = ddeVEuler(theta,tau,true);
 %% FUNCTIONS
 
 function [eulert, M_x] = MGEulerComp( tau, eta, p, gamma, iterations, theta, initial)
@@ -138,7 +154,6 @@ function [eulert, M_x] = MGEulerComp( tau, eta, p, gamma, iterations, theta, ini
     % M_x: Matrix of reservoir history of size (# tau, Nodes)
     % eulert: corresponding t values for M_x
     %
-    
     
 
     N = floor(tau ./ theta);            % Determine how many appoximate nodes we can fit given some theta
@@ -225,7 +240,7 @@ function [diff, eta, p, gamma, iterations, initial, tElapsed] = ddeVEuler(theta,
     
     % Define variables
     eta = 2;            % mult. in front of delayed term
-    p = 9.6;            % exponent
+    p = 1;            % exponent
     gamma = 1;          % in front of x(t) term
     iterations = 200;   % how many iterations of tau do you want? 
     initial = 1.3;      % initial value
@@ -272,7 +287,7 @@ function [diff, eta, p, gamma, iterations, initial, tElapsed] = ddeVEuler(theta,
         ylabel("squared error")
 
 
-        saveas(figure1,'EulervDDE23.png')
+%         saveas(figure1,'EulervDDE23.png')
     else
         return
     end
