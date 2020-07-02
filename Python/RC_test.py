@@ -14,103 +14,16 @@ from matplotlib import pyplot as plt
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import RidgeCV
 from Delay_Reservoir import DelayReservoir
+from helper_files import NARMA_Generator, NARMA_Diverges, cross_validate
 from joblib import Parallel, delayed
 
 import pandas as pd
 import seaborn as sns
 from hyperopt import fmin, tpe, hp
-# from hyperopt import hp, tpe, fmin
 
 
 ############################################################################
 
-def NARMA_Generator(length,u):
-    """
-    Generates NARMA10 Sequence
-
-    Args:
-        length: Length of series
-        u: Input data
-
-    Returns:
-        y_k: NARMA10 series with k = length entries
-    """
-
-    #Generate first ten entries in series
-    y_k = np.ones(10)*0.1
-
-    #Iteratively calculate based on NARMA10 formula
-    for k in range(10,length):
-        t = 0.3*y_k[k-1]+0.05*y_k[k-1]*sum(y_k[k-1-i] for i in range(10))+1.5*\
-        u[k-1]*u[k-10]+0.1
-        y_k = np.append(y_k,t)
-
-    return y_k
-
-def NARMA_Diverges(u):
-    """
-    Determine if random input creates a diverging NARMA10 sequence
-    
-    Args:
-        u: Input data
-        
-    Returns:
-        boolean: True if series diverges, false otherwise
-    """
-    
-    #Generate first ten entries in series
-    y_k = np.ones(10)*0.1
-    length = len(u)
-
-    #Iteratively calculate based on NARMA10 formula
-    for k in range(10,length):
-        t = 0.3*y_k[k-1]+0.05*y_k[k-1]*sum(y_k[k-1-i] for i in range(10))+1.5*\
-        u[k-1]*u[k-10]+0.1
-        
-        #Series diverges if element greater than 1
-        if t > 1:
-            return True
-        y_k = np.append(y_k,t)
-
-    return False
-    
-
-def cross_validate(alphas,x,x_test,target):
-    """
-    Manual corss-validation, ie choosing optimal ridge parameter
-    
-    Args:
-        alphas: ridge parameters to validate
-        x: training data
-        x_test: validation data
-        target: correct labels for training/validation
-        
-    Returns:
-        best_nrmse: lowest validation NRMSE found
-        best_prediction: prediction with lowest validation NRMSE
-        best_input: training prediction with lowest validation NRMSE
-    """
-    best_prediction = np.array([])
-    best_nrmse = np.inf
-    best_train = np.array([])
-    np.append(alphas,0)
-    for a in alphas:
-        clf = Ridge(alpha = a)
-        clf.fit(x,target[:len(x)])
-        y_test = clf.predict(x_test)
-        y_input = clf.predict(x)
-        NRMSE = np.sqrt(np.mean(np.square(y_test[50:]-target[len(x)+50:]))/\
-            np.var(target[len(x)+50:]))
-        
-        #Compare with previous best and update if better
-        if(NRMSE < best_nrmse):
-            best_nrmse = NRMSE
-            best_prediction = y_test
-            best_train = y_input
-    
-    return best_nrmse,best_prediction,best_train
-        
-    
 
 def NARMA_Test(test_length = 800,train_length = 800,
         plot = True,N = 400,eta = 0.4,gamma = 0.05,tau = 400, fudge = 1,
@@ -355,12 +268,12 @@ def mg_hayes_comp():
     activate = 'mg'
     r1 = DelayReservoir(N = 400,eta = 1,gamma = 0.05,theta = 0.2,\
         beta = 1,tau = 400)
-    x_mg, vn_mg = r1.calculate(u[:train_length],m,bits,t,activate)         # Takes the actual output
+    x_mg, vn_mg = r1.calculate(u[:train_length],m,bits,t,activate, no_act_res = True)         # Takes the actual output
     # x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
     # Hayes portion, collect output
     activate = 'hayes'
-    x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate)
+    x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res = True)
     # x_hayes_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
     # Flatten the values

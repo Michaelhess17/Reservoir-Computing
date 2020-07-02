@@ -58,7 +58,7 @@ class DelayReservoir():
         else:
             return (m@u).T
 
-    def calculate(self,u,m,bits,t,act):
+    def calculate(self,u,m,bits,t,act,no_act_res = False):
         """
         Calculate reservoir state over duration u
 
@@ -85,7 +85,7 @@ class DelayReservoir():
         J = J.flatten(order= 'C')
         J = J.reshape((1,(1+cycles)*self.N),order = 'F')
         M_x = np.zeros(J.shape)
-        MG_bot_vals = np.zeros(J.shape)         # Create container to store values of denominator 
+        Mx_no_act = np.zeros(J.shape)         # Create container to store values of denominator 
     
         
         #Select activation function
@@ -94,30 +94,40 @@ class DelayReservoir():
         #Iteratively solve differential equation with Euler's Method  
         for i in range(1,(cycles+1)*self.N*t//1): 
             vn = M_x[0,i-1]-M_x[0,i-1]*self.theta/t
-
+            
             if act == "wright":         # In the case that we want wright, take out the x(t) term by redefining vn
                 vn = M_x[0,i-1]
 
             arg = M_x[0,i-1-self.tau*t] 
-            
             vn += self.eta*a(self.beta*arg+self.gamma*J[0,(i-1)//t]) * self.theta/t
             M_x[0,i] = vn
-
-            MG_bot_vals[0,i] = self.beta*arg+self.gamma*J[0,(i-1)//t]  # Store the denominator values (without the "1+", this can be added in if needed for computation)
-        
-
+            
         #Reshape matrix
         M_x_new = np.zeros((1+cycles,self.N*t))
-        MG_bot_new = np.zeros((1+cycles, self.N*t))  
 
         # M_x_new[:,i*self.N:(i+1)*self.N] = \
         #     M_x[0,i].reshape(1+cycles,self.N)         # Before M_x[i].reshape(1+cycles,self.N)  
 
         M_x_new = M_x.reshape(1+cycles,self.N)
-        MG_bot_new = MG_bot_vals.reshape(1+cycles,self.N)
-         
+
+
+        if no_act_res:
+
+            # Loop through and solve no_activation portions
+            for i in range(1,(cycles+1)*self.N*t//1): 
+                vn_no_act = Mx_no_act[0,i-1]-M_x[0,i-1]*self.theta/t
+                vn_no_act += self.eta*(self.beta*arg+self.gamma*J[0,(i-1)//t]) * self.theta/t
+                Mx_no_act[0,i] = vn_no_act  # Store the denominator values (without the "1+", this can be added in if needed for computation)
+
+            # Reshape Matrix
+            Mx_new_nAct= np.zeros((1+cycles, self.N*t))  
+            Mx_new_nAct = Mx_new_nAct.reshape(1+cycles,self.N)
+
+            return M_x_new[1:,0:self.N*t:t], Mx_new_nAct[1:,0:self.N*t:t]  
+
+
         #Remove first row of zeroes, select values at node spacing
-        return M_x_new[1:,0:self.N*t:t], MG_bot_new[1:,0:self.N*t:t]  
+        return M_x_new[1:,0:self.N*t:t]
 
     def activationFunction(self,func):
         """
