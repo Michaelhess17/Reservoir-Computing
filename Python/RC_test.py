@@ -1,8 +1,11 @@
  #!/usr/bin/env python3
 
-__author__ = "Philip Jacobson"
+__original_author__ = "Philip Jacobson"
 __email__ = "philip_jacobson@berkeley.edu"
 
+__editors__ = 'Michael Lee and Michael Hess'
+__MH_email__ = "mhess21@cmc.edu"
+__ML_email__ = "mlee22@cmc.edu"
 
 import numpy as np
 import random
@@ -12,6 +15,10 @@ import time
 import pandas
 from matplotlib import pyplot as plt
 from sklearn.linear_model import Ridge
+from sklearn.linear_model import RidgeClassifier
+from tqdm import tqdm
+import signal
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import RidgeCV
 from Delay_Reservoir import DelayReservoir
 from helper_files import NARMA_Generator, NARMA_Diverges, cross_validate
@@ -392,6 +399,110 @@ def hyperopt_grad_wright():
     )
 
     print(best)
+    
+def make_training_testing_set(num_sin=3000,num_saw=3000,num_square=3000, test_percent=0.1):
+    sin = lambda x,theta: np.sin(theta*x)
+    square = lambda x, theta: np.sign(theta*x)
+    sawtooth = lambda x, theta: signal.sawtooth(theta*x)
+    t = np.linspace(-5, 5, 500)
+    sins = []
+    saws = []
+    squares = []
+    for x in range(num_sin):
+        # print(f'sin: {x}')
+        theta = np.random.uniform(0.001,5)
+        wave = sin(t, theta)
+        for idx in range(len(wave)):
+            noise = 0.02 * np.random.normal()
+            if np.random.uniform(0,1) <= 0.5:
+                wave[idx] += noise
+            else:
+                wave[idx] -= noise
+        sins.append(wave)
+    for x in range(num_saw):
+        # print(f'saw: {x}')
+        theta = np.random.uniform(0.001,5)
+        wave = sawtooth(t, theta)
+        for idx in range(len(wave)):
+            noise = 0.02 * np.random.normal()
+            if np.random.uniform(0,1) <= 0.5:
+                wave[idx] += noise
+            else:
+                wave[idx] -= noise
+        saws.append(wave)
+    for x in range(num_square):
+        # print(f'square: {x}')
+        theta = np.random.uniform(0.001,5)
+        wave = square(t, theta)
+        for idx in range(len(wave)):
+            noise = 0.02 * np.random.normal()
+            if np.random.uniform(0,1) <= 0.5:
+                wave[idx] += noise
+            else:
+                wave[idx] -= noise
+        squares.append(wave)
+    X = np.concatenate([sins,saws,squares])
+    y = np.concatenate([[0 for _ in range(num_sin)], [1 for _ in range(num_saw)], [2 for _ in range(num_square)]])
+
+    return train_test_split(X, y, test_size = test_percent, random_state = 42)
+
+def Classification_Test(num_loops=1, N=400, eta=[0.35], gamma=[0.05], phi=[0.09 * np.pi], tau=[400],
+                bits=np.inf, preload=False, write=False, mask=0.1, activate='mg',
+                beta=[1.0], wright_param=-1,power=7, t=1):
+     """
+	 Args:
+		 test_length: length of testing data
+		 train_length: length of training data
+		 num_loops: number of delay loops in reservoir
+		 a: ridge regression parameter
+		 N: number of virtual nodes
+		 plot: display calculated time series
+		 gamma: input gain
+		 eta: oscillation strength
+		 phi: phase of MZN
+		 r: loop delay length
+		 bits: bit precision
+		 preload: preload mask and time-series data
+		 mask: amplitude of mask values
+		 activate: activation function to be used (sin**2,tanh,mg)
+		 cv: perform leave-one-out cross validation
+		 beta: driver gain
+		 V_low: ADC lower bound
+		 V_high: ADC upper bound
+		 t: timestep used to solve diffeq
+		 layers: number of hidden layers, ie number of cascaded reservoirs
+		 sr: splitting ratio
+		 switching: WDM switching
+		 w: number of wavelengths
+		 auto: automatically calculate ADC range
+		 IA: input to all layers of (deep) network
+
+	 Returns:
+		 NRMSE: Normalized Root Mean Square Error
+	 """
+
+     X_train, X_test, y_train, y_test = make_training_testing_set(num_sin=3333,num_saw=3333,num_square=3334,test_percent=0.1)
+
+     clf = RidgeClassifier(alpha=0)
+     m = np.array([random.choice([-mask, mask]) for i in range(N)])
+
+     # Instantiate Reservoir, feed in training and predictiondatasets
+     r1 = DelayReservoir(N=N, eta=eta, gamma=gamma, theta=0.2,
+                         loops=num_loops, phi=phi, beta=beta, tau=tau, wright_param=wright_param, power=power)
+     Xs = []
+     for idx in tqdm(len(X_train)):
+        Xs.append(np.array(r1.calculate(X_train[idx], m, bits, t, activate, V_low=0.0, V_high=1.0, sr=0.5)).flatten())
+     Xs = np.array(Xs)
+     clf.fit(Xs,y_train)
+     Xs = []
+     for idx in tqdm(len(X_test)):
+        print(idx)
+        Xs.append(np.array(r1.calculate(X_test[idx], m, bits, t, activate, V_low=0.0, V_high=1.0, sr=0.5)).flatten())
+     Xs = np.array(Xs)
+
+     return clf.score(Xs,y_test)
+
+
 
 
 ##### TESTS #####
