@@ -1,11 +1,26 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
+
+__author__ = "Philip Jacobson"
+__email__ = "philip_jacobson@berkeley.edu"
+
 
 import numpy as np
 import random
+import multiprocessing
+import csv
+import time
+import pandas
 from matplotlib import pyplot as plt
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import RidgeCV
 from Delay_Reservoir import DelayReservoir
+from joblib import Parallel, delayed
+
+import pandas as pd
+import seaborn as sns
+from hyperopt import fmin, tpe, hp
+# from hyperopt import hp, tpe, fmin
+
 
 ############################################################################
 
@@ -32,33 +47,100 @@ def NARMA_Generator(length,u):
 
     return y_k
 
+def NARMA_Diverges(u):
+    """
+    Determine if random input creates a diverging NARMA10 sequence
+    
+    Args:
+        u: Input data
+        
+    Returns:
+        boolean: True if series diverges, false otherwise
+    """
+    
+    #Generate first ten entries in series
+    y_k = np.ones(10)*0.1
+    length = len(u)
 
-def NARMA_Test(test_length = 800,train_length = 800,num_loops = 1,a = 0,
-        plot = True,N = 400,eta = 0.2,gamma = 0.05,phi = np.pi/6,tau = 400,
-        bits = 8,preload = False):
+    #Iteratively calculate based on NARMA10 formula
+    for k in range(10,length):
+        t = 0.3*y_k[k-1]+0.05*y_k[k-1]*sum(y_k[k-1-i] for i in range(10))+1.5*\
+        u[k-1]*u[k-10]+0.1
+        
+        #Series diverges if element greater than 1
+        if t > 1:
+            return True
+        y_k = np.append(y_k,t)
+
+    return False
+    
+
+def cross_validate(alphas,x,x_test,target):
+    """
+    Manual corss-validation, ie choosing optimal ridge parameter
+    
+    Args:
+        alphas: ridge parameters to validate
+        x: training data
+        x_test: validation data
+        target: correct labels for training/validation
+        
+    Returns:
+        best_nrmse: lowest validation NRMSE found
+        best_prediction: prediction with lowest validation NRMSE
+        best_input: training prediction with lowest validation NRMSE
+    """
+    best_prediction = np.array([])
+    best_nrmse = np.inf
+    best_train = np.array([])
+    np.append(alphas,0)
+    for a in alphas:
+        clf = Ridge(alpha = a)
+        clf.fit(x,target[:len(x)])
+        y_test = clf.predict(x_test)
+        y_input = clf.predict(x)
+        NRMSE = np.sqrt(np.mean(np.square(y_test[50:]-target[len(x)+50:]))/\
+            np.var(target[len(x)+50:]))
+        
+        #Compare with previous best and update if better
+        if(NRMSE < best_nrmse):
+            best_nrmse = NRMSE
+            best_prediction = y_test
+            best_train = y_input
+    
+    return best_nrmse,best_prediction,best_train
+        
+    
+
+def NARMA_Test(test_length = 800,train_length = 800,
+        plot = True,N = 400,eta = 0.4,gamma = 0.05,tau = 400, fudge = 1,
+        bits = np.inf, preload = False, write = False,mask = 0.1, activate = 'mg',
+        cv = False,beta = 1.0,t = 1,theta = 0.2):
     """
     Args:
         test_length: length of testing data
         train_length: length of training data
-        num_loops: number of delay loops in reservoir
         a: ridge regression parameter
         N: number of virtual nodes
         plot: display calculated time series
         gamma: input gain
         eta: oscillation strength
-        phi: phase of MZN
-        r: loop delay length 
         bits: bit precision
         preload: preload mask and time-series data
+        mask: amplitude of mask values
+        activate: activation function to be used (sin**2,tanh,mg)
+        cv: perform leave-one-out cross validation
+        beta: driver gain
+        t: timestep used to solve diffeq
 
     Returns:
         NRMSE: Normalized Root Mean Square Error
     """
-    
+
     #Import u and m
     if preload:
-        file1 = open("data/Input_sequence.txt","r")
-        file2 = open("data/mask_2.txt","r")
+        file1 = open("Data/Input_sequence.txt","r")
+        file2 = open("Data/mask_2.txt","r")
         contents = file1.readlines()
         contents2 = file2.readlines()
         u = []
@@ -71,181 +153,365 @@ def NARMA_Test(test_length = 800,train_length = 800,num_loops = 1,a = 0,
         file2.close()
         u = np.array(u)
         m = np.array(m)
+        m = m[:N]           # Able to do preloaded data for all sorts of node sizes
     #Randomly initialize u and m
     else:
         u = np.random.rand(train_length+test_length)/2.
-        m = np.array([random.choice([-0.1,0.1]) for i in range(N//num_loops)])
+        while NARMA_Diverges(u):
+            u = np.random.rand(train_length+test_length)/2.
+        m = np.array([random.choice([-mask,mask]) for i in range(N)])
  
     #Calculate NARMA10 target
     target = NARMA_Generator(len(u),u)
+    alphas = np.logspace(-20,5,16)
     
-    #Instantiate Reservoir, feed in training and verification datasets
-    r1 = DelayReservoir(N = N//num_loops,eta = eta,gamma = gamma,theta = 0.2,
-        loops=num_loops,phi = phi)
-    x = r1.calculate(u[:train_length],m,bits)
-    #x_ideal = r1.calculateMZN(u[:train_length],m)
-    x_test = r1.calculate(u[train_length:],m,bits)
-    #x_test_ideal = r1.calculateMZN(u[train_length:],m) 
-    
-    #Train using Ridge Regression
-    #clf = RidgeCV(alphas = a,fit_intercept = True)
-    clf = Ridge(alpha = a)
-    clf.fit(x,target[:train_length])
-    y_test = clf.predict(x_test)
-    y_input = clf.predict(x)
+    #Instantiate Reservoir, feed in training and predictiondatasets
+    r1 = DelayReservoir(N = N,eta = eta,gamma = gamma,theta = theta,
+        beta = beta,tau = tau, fudge = fudge)  
+    x = r1.calculate(u[:train_length],m,bits,t,activate)[0]
+    x_test = r1.calculate(u[train_length:],m,bits,t,activate)[1]
 
-    #Calculate NRMSE
-    NRMSE = np.sqrt(np.mean(np.square(y_test[50:]-target[train_length+50:]))/\
+    x_test_bot = r1.calculate(u[train_length:],m,bits,t,activate)[1]
+
+    #Train using Ridge Regression with hyperparameter tuning
+    if(cv):
+        NRMSE,y_test,y_input = cross_validate(alphas,x,x_test,target)
+    else:
+        clf = Ridge(alpha = 0)
+        clf.fit(x,target[:train_length])
+        y_test = clf.predict(x_test)
+        y_input = clf.predict(x)
+    
+        #Calculate NRMSE of prediction data
+        NRMSE = np.sqrt(np.mean(np.square(y_test[50:]-target[train_length+50:]))/\
             np.var(target[train_length+50:]))
     
+    #Calculate NRMSE of training data
     NRMSEi = np.sqrt(np.mean(np.square(y_input-target[:train_length]))/\
             np.var(target[:train_length]))
     
+
     #Write to File
-    '''
-    x_total = np.concatenate((x,x_test))
-    x_total = x_total.flatten(order='C')
-    file1 = open("data/64_bit_test_x.txt","w+")
-    file2 = open("data/64_bit_test_y.txt","w+")
-    for i in range(2*320000):
-        file1.write("%f"%x_total[i]+"\n")
-        if(i < 1600):
-            file2.write("%f"%target[i]+"\n")
-    file1.close()
-    '''
+    if(write):
+        x_total = np.concatenate((x,x_test))
+        x_total = x_total.flatten(order='C')
+        file1 = open("data/x_comparison .txt","w+")
+        for i in range(400000):
+            file1.write("%f"%x_total[i]+"\n")
+        file1.close()
+    
 
     
     #Plot predicted Time Series
-    if(plot == True):
-        #fig, (ax1,ax2) = plt.subplots(2,1)
-        #ax1.plot(x.flatten()[5000:])
-        #ax2.plot(x_ideal.flatten()[5000:])
-        #plt.plot(x.flatten()[:1200])
+    if plot:
+        plt.figure(1)
+        plt.plot(np.linspace(0,1e-3*train_length,N*train_length),x.flatten()[0:])
+        plt.xlabel('time [ms]')
+        plt.ylabel('x(t) [V]')
+        plt.figure(2)
         plt.plot(y_test[50:],label='Prediction')
         plt.plot(target[train_length+50:],label='Target')
         plt.title('NRMSE = %f'%NRMSE)
         plt.legend()
+
+        plt.figure(2)
+        plt.plot(y_test[50:],label='Prediction')
+        plt.plot(target[train_length+50:],label='Target')
+        plt.title('NRMSE = %f'%NRMSE)
+        plt.legend()
+
+        plt.figure(3)
+        plt.plot(np.linspace(0,x_test_bot.flatten().shape[0],x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:], label = "[beta * x(t) + gamma * j(t)] ^ 1")
+        plt.plot(np.linspace(0,N*u.shape[0],u.shape[0]),u.flatten()[0:], label = "Input Narma Taks")
+        plt.xlabel("cycle * nodes")
+        plt.title("MG Denominator compared to NARMA Input")
+        plt.legend()
+
+        plt.figure(4)
+        plt.plot(np.linspace(0,x_test_bot.flatten().shape[0],x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:], label = "[beta * x(t) + gamma * j(t)] ^ 1")
+        plt.xlabel("cycle * Nodes")
+        plt.title("MG Denominator : [beta * x(t) + gamma * j(t)] ^ 1")
+
+        plt.show()
+    
+    return NRMSE, x_test_bot
+
+
+def run_test(eta, max_Tau, gamma, theta = 0.2, activation = "hayes"):
+    """
+    Run Narma tests. Simplifies parameter input for ease of reading
+    
+    Args:
+        activation : "wright", "mg", "hayes" (in the future)
+        eta : term that multiplies the delayed portion
+        maxTau : the maximum tau for some given k (found through matlab program)
+        theta : time spacing between nodes
+        
+    Returns:
+        output: NRMSE of Narma task
+    """
+    Nodes =int(max_Tau//theta)         # First pass set theta to 0.2, may have to experimentally find ideal theta for wright eq.
+    plot_yn = True          # Plot or no plot, that is the question
+    # T = 0.08            # Time normalization constant?
+
+    output = NARMA_Test(
+            test_length = 800,
+            train_length = 800,
+            gamma = gamma,          # Input gain
+            plot = plot_yn,
+            N = Nodes,
+            eta =  eta,           # parameter in front of delayed term (for wright: k)
+            bits = np.inf,
+            preload = False,
+            cv = True,
+            fudge = 1,
+            beta = 1,
+            tau = Nodes,
+            activate = activation,
+            theta = 0.2 
+                )
+
+    return output
+
+def wright_grid_search(max_Tau = 9.992, wright_k = -0.15, eta = 0.05, theta = 0.2, gamma = 0.05, parameter_searched = "theta", activation = "hayes"):
+    """
+    Runs a grid search manipulating theta for the Wright equation. max_tau is the longest tau possible at wright_k.
+    Holds all else constant and varies theta. Next ones will have to vary gamma.
+
+    args:
+        wright_k: k term in the Wright equation
+        max_Tau: longest value of tau at wright_k
+        eta: holding eta fixed case, default value of eta
+        parameter_searched = which parameter(s) would you like to do a grid search for? ("theta", "eta_gamma")
+
+    output:
+        if "theta":
+            graph showing NRMSE on vertical vs choices of theta
+        if "eta_gamma":
+            heatmap showing NRMSE various combinations of k(eta in program) and gamma
+    """
+
+    if parameter_searched == "theta":
+        theta_range = np.linspace(0.2,0.3,10)           # Generate theta range
+        wright_k = eta          # redefinition for ease of understanding that eta serves the role of k in the wright equation
+        output_vals = {}            # Dictionary to hold output values
+        for num,i in enumerate(theta_range):
+            
+            output = run_test(activation = activation, theta = i, eta = wright_k, max_Tau = max_Tau, gamma = gamma)
+            output_vals[theta_range[num]] = output          # Collect theta value and corresponding NRMSE in a dictionary entry
+        
+        # Unzip dictionary entries
+        lists = sorted(output_vals.items())
+        x, y = zip(*lists)
+
+        # Plot data
+        plt.plot(x,y)
+        plt.xlabel('theta')
+        plt.ylabel('NRMSE')
         plt.show()
 
-    return NRMSE
+    if parameter_searched == "eta_gamma":
+        interps = 10         # How many combinations of k and gamma would you like?
+        k_range = np.linspace(-0.20,-0.15,interps)
+        gamma_range = np.linspace(0.00,0.05,interps)
+        eg_output = np.zeros((interps,interps))
 
-def NARMA_Test_Compare(test_length = 200,train_length = 800,num_loops = 1,
-        a = 0,plot = True,N = 400,eta = 0.5,gamma = 1,phi = np.pi/4,r = 1):
-    """
-    Compare with pre-determined NARMA10 series
+        for k_index, kr in enumerate(k_range):
+            for g_index, gr in enumerate(gamma_range):
 
-    Args:
-        test_length: length of verification data
-        train_length: length of training data
-        num_loops: number of delay loops in reservoir
-        a: list of ridge regression constants for hyperparameter tuning
-        N: number of virtual nodes
-        plot: display calculated time series
-        gamma: input gain
-        eta: oscillation strength
-        phi: phase of MZN
-        r: loop length ratio
+                output = run_test(activation = activation, theta = theta, eta = kr, max_Tau = max_Tau, gamma = gr)
+                eg_output[k_index,g_index] = output         # eg_output fills left corner to right corner, \n and so on
+        
+        # plot data 
+        ax = sns.heatmap(eg_output, cmap = 'coolwarm', xticklabels = np.round_(gamma_range,4) , yticklabels = np.round_(k_range,4))
+        ax.set(xlabel = "gamma", ylabel = "k", title = "Wright simulation results for NARMA task")
+        plt.show()
 
-    Returns:
-        NRMSE: Normalized Root Mean Square Error
-    """
-    
-    #Import u and m
-    file1 = open("data/uin_and_target.txt","r")
-    file2 = open("data/Mask.txt","r")
+def mg_hayes_comp():
+    # Set large parameters for calculate
+    t = 1
+    bits = np.inf
+    train_length = 800
+
+
+    # Import data
+
+    file1 = open("Data/Input_sequence.txt","r")         # Reads input and masking files. stores them in u/m
+    file2 = open("Data/mask_2.txt","r")
     contents = file1.readlines()
     contents2 = file2.readlines()
     u = []
-    target = []
     m = []
     for i in range(1000):
         u.append(float(contents[i][0:contents[i].find("\t")]))
-        target.append(float(contents[i][contents[i].find("\t"):]))
         if i < 400:
             m.append(float(contents2[i][0:contents2[i].find("\n")]))
     file1.close()
     file2.close()
     u = np.array(u)
     m = np.array(m)
-    target = np.array(target)
-    
-    #Instantiate Reservoir, feed in training and verification datasets
-    r1 = DelayReservoir(N = N//num_loops,eta = eta,gamma = gamma,theta = 0.2,
-        loops=num_loops,phi = phi)
-    x = r1.calculate(u[:train_length],m)
-    x_test = r1.calculate(u[train_length:],m)
-    
-    x = []
-    file3 = open("data/X_node.txt","r")
-    contents3 = file3.readlines()
-    print(len(contents3))
-    for i in range(400000):
-        x.append(float(contents3[i][:contents3[i].find("\n")]))
-    
-    x = np.array(x)
-    x = x.reshape((-1,1))
-    x = x.reshape((1000,400))
 
-    #Train using Ridge Regression
-    clf = Ridge(alpha = a,fit_intercept=True)
-    clf.fit(x[:800],target[:train_length])
-    w = clf.coef_
-    y_train = x@w
-    y_test = clf.predict(x[800:])
-    
-    #Write to file
+    # MG portion, collect output
+    activate = 'mg'
+    r1 = DelayReservoir(N = 400,eta = 1,gamma = 0.05,theta = 0.2,\
+        beta = 1,tau = 400)
+    x_mg, vn_mg = r1.calculate(u[:train_length],m,bits,t,activate)         # Takes the actual output
+    # x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
-    x_total = np.concatenate((x,x_test))
-    x_total = x_total.flatten(order='C')
-    file3 = open("data/y_train2.txt","w+")
-    for i in range(800):
-        file3.write("%f"%y_train[i]+"\n")
-    file3.close()
+    # Hayes portion, collect output
+    activate = 'hayes'
+    x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate)
+    # x_hayes_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
-    
-    #Calculate NRMSE
-    NRMSE = np.sqrt(np.mean(np.square(y_test[50:]-target[train_length+50:]))/\
-            np.var(target[train_length+50:]))
-    
-    #Plot predicted Time Series
-    
-    if(plot == True):
-        plt.plot(y_test[50:],label='Prediction')
-        plt.plot(target[train_length+50:],label='Target')
-        plt.title('NRMSE = %f'%NRMSE)
-        plt.legend()
-        plt.show()
-    
-    return NRMSE
+    # Flatten the values
+    x_mg = x_mg.flatten()
+    x_hayes = x_hayes.flatten()
+
+    vn_mg = vn_mg.flatten()
+    vn_hayes = vn_hayes.flatten()
+
+    # Plot the data
+    plt.figure(1)
+    plt.plot(x_mg, label = "mackey-glass")
+    plt.plot(x_hayes, label = "hayes")
+    plt.xlabel("cycle * Nodes")
+    plt.title("Raw Mg vs Hayes Ouputs with Same NARMA Input")
+    plt.legend()
+
+    plt.figure(2)
+    plt.plot(vn_mg, label = "mackey-glass vn")
+    plt.plot(vn_hayes, label = "hayes vn")
+    plt.xlabel("cycle * Nodes")
+    plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
+    plt.legend()
+
+    plt.show()
+
+def ml_test_hayes(param):
+    """
+    Sets up 'function' to minimize. 
+    Declares variables to hyperopt.
+    Returns the mean NRMSE of 3 NARMA10 tasks
+    """
+    gamma, eta, beta, theta, hayes_param = \
+        param['gamma'], param['eta'], param['beta'], param['theta'] , param['hayes_param']
+
+    N = 400            # Number of Nodes
+
+    return np.mean([NARMA_Test(
+    test_length = 1000,
+    train_length = 3200,
+    gamma = gamma,
+    plot = False,
+    N = N,
+    eta = eta,
+    bits = np.inf,
+    preload = False,
+    beta = beta,
+    fudge = hayes_param,
+    tau = N,
+    activate = 'hayes',
+    theta = theta
+    ) for _ in range(3)])
+
+def hyperopt_grad_hayes():
+    """
+    calls the fmin 
+    """
+    best = fmin(
+        fn = ml_test_hayes, 
+        space = {
+            # 'x': hp.randint('x',800),
+            'gamma': hp.uniform('gamma', 0.01, 3),
+            'eta': hp.uniform('eta', 0, 1),
+            # 'N': hp.randint('N',800),
+            'theta': hp.uniform('theta', 0, 1),
+            'beta': hp.uniform('beta', 0, 1),
+            'hayes_param': hp.uniform('hayes_param', -1, 0)
+        },
+        algo=tpe.suggest,
+        max_evals=100
+    )
+
+    print(best)
+
+def ml_test_wright(param):
+    """
+    Sets up 'function' to minimize. 
+    Declares variables to hyperopt.
+    Returns the mean NRMSE of 3 NARMA10 tasks
+    """
+    gamma, k, N, theta, beta = \
+        param['gamma'], param['k'], param['N'],\
+            param['theta'], param['beta']
+
+    return np.mean([NARMA_Test(
+    test_length = 800,
+    train_length = 3200,
+    gamma = gamma,
+    plot = False,
+    N = N,
+    eta = k,
+    bits = np.inf,
+    preload = False,
+    beta = beta, 
+    tau = N,
+    activate = 'hayes',
+    theta = theta
+    ) for _ in range(3)])
+
+def hyperopt_grad_wright():
+    """
+    calls the fmin 
+    """
+    best = fmin(
+        fn = ml_test_hayes, 
+        space = {
+            # 'x': hp.randint('x',800),
+            'gamma': hp.uniform('gamma', 0.01, 2),
+            'eta': hp.uniform('k', 0, 1),
+            'N': hp.randint('N',800),
+            'theta': hp.uniform('theta', 0.0001, 1),
+            'beta': hp.uniform('beta', 0, 1)
+        },
+        algo=tpe.suggest,
+        max_evals=100
+    )
+
+    print(best)
 
 
-#alphas = np.logspace(-10,-6,100)
-print(NARMA_Test(test_length = 800,train_length = 800,num_loops = 1,
-    a = 1e-8,gamma = 0.05,plot = True,N = 400,eta = 0.4,tau = 400,bits = 20,
-    preload = False))
+##### TESTS #####
+
+#### mg_hayes_comp tests ####
+mg_hayes_comp()
+
+#### Grid search tests ####
+# wright_grid_search(parameter_searched="eta_gamma", activation = "hayes")
 
 
-#print(NARMA_Test_Compare())
+#### run_test tests ####
+# run_test(eta = 0.5, max_Tau = 9.993, gamma = 0.7, theta = 0.2, activation = "wright")
+# run_test(eta = 0.05, max_Tau = 150, gamma = 0.5, theta = 0.2, activation = "hayes")
 
 
-'''
-l = np.linspace(1e-11,1e-10,20)
-error1 = []
-error2 = []
-for i in range(10):
-    #error1.append(NARMA_Test(test_length = 800,train_length = 800,
-    #    num_loops = 1,a = 0, plot = False,N = 200))
-    error2.append(NARMA_Test(test_length = 800,train_length = 800,
-        num_loops = 1,a = 5e-15,gamma = 0.05, plot = False,N = 400,bits = 20))
+#### Hyperopt Tests ####
+# hyperopt_grad_wright()
+# hyperopt_grad_hayes()
 
 
-
-
-#plt.plot(10*np.log10(g[1:]),error2[1:])
-#plt.ylabel('NRMSE')
-#plt.xlabel('Input gain [dB]')
-#plt.show()
-#print(np.mean(error1),np.std(error1))
-#print(error2)
-print(np.mean(error2),np.std(error2))
-'''
+#### General Test for NARMA_Test ####
+# NARMA_Test(
+#     test_length = 800,
+#     train_length = 3200,
+#     gamma = 0.48707341674880045,
+#     plot = False,
+#     N = 317,
+#     eta = 0.9615229252495553
+#     bits = np.inf,
+#     preload = False,
+#     beta = 0.408835328209339, 
+#     tau = x,
+#     activate = 'hayes',
+#     theta = theta
+#     )

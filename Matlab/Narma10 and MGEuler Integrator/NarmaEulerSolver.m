@@ -99,9 +99,9 @@ Narma = NARM_Generator(length(Inputsequence), Inputsequence);
 
 %% Solve using MGEulerComp
     
-Define vars -> Using the same variables as RC_test.py from Phillip 
+% Define vars -> Using the same variables as RC_test.py from Phillip 
 tau = 2;
-eta = 1.;
+eta = 1.30;
 p = 7;
 gamma = 1; 
 theta = 0.001;      % Integration step
@@ -112,7 +112,7 @@ iterations = length(Inputsequence);     %Should be the same len as the input seq
 % Solve using Euler Solver
 [t, soly] = MGEulerComp(tau, eta, p, gamma, iterations, theta, scaling, input);
 
-plot(t,soly);
+plot(t, soly);
 
 %% Masking Function
 function maskedInput = Mask(input, varargin)

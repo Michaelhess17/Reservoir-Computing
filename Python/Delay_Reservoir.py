@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 
+__author__ = "Philip Jacobson"
+__email__ = "philip_jacobson@berkeley.edu"
+
 import numpy as np
 import random
+from scipy import signal
+from sklearn.metrics.pairwise import polynomial_kernel
+from sklearn.metrics.pairwise import rbf_kernel
 
 ##########################################################################
 
@@ -10,23 +16,24 @@ class DelayReservoir():
     Class to perform Reservoir Computing using Delay-Based Architecture
     """
     
-    def __init__(self,N = 400,eta = 0.4,gamma = 0.05,theta = 0.2,loops=1,
-            phi=np.pi/6):
+    def __init__(self,N = 400,eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, fudge = 1):
         """
         Args:
             N:  Number of Virtual Nodes
-            eta: Mackey Glass feedback strength
-            gamma: Input Scaling
+            eta: Feedback gain
+            gamma: Input gain
             theta: Distance between virtual nodes
-            loops: Number of delay loops in reservoir
-            phi: Phase (bias) for MZN
+            beta: Driver gain 
+            tau: Ratio of loop length to node spacing for each loop
         """
+        
         self.N = N
         self.eta = eta
         self.gamma = gamma
         self.theta = theta
-        self.loops = loops
-        self.phi = phi
+        self.beta = beta
+        self.tau = tau
+        self.fudge = fudge
 
     def mask(self,u,m = None):
         """
@@ -37,317 +44,99 @@ class DelayReservoir():
         Returns:
             J: Multiplexed (masked) data
         """
-        if m.all() == None:
-            m = np.array([random.choice([-0.1,0.1]) for i in range(N)])
-        u = np.reshape(u,(-1,1))
-        m = np.reshape(m,(1,-1))
-        
-        return u@m
 
-    def calculate(self,u,m):
+            
+        if len(m.shape) == 1:
+            
+            if m.all() == None:
+                m = np.array([random.choice([-0.1,0.1]) for i in range(self.N)])
+            
+            u = np.reshape(u,(-1,1))
+            m = np.reshape(m,(1,-1))
+            
+            return u@m
+        else:
+            return (m@u).T
+
+    def calculate(self,u,m,bits,t,act):
         """
-        Calculates Reservoir State over the duration of u
-        
-        Args:
-            u: Input data
-            m: Mask array
-
-        Returns:
-            M_x: Matrix of reservoir history
-        """
-        
-        cycles = len(u)
-        
-        #Add extra layer to account for delay at t = 0
-        M_x = np.zeros((1+cycles,self.N*self.loops))
-        J = self.mask(u,m)
-        
-        #Add extra layer to match indexes with M_x
-        J = np.vstack((np.zeros((1,self.N*self.loops)),J))
-
-        #Iteratively solve Mackey Glass Equation with Euler's Method
-        for i in range(1,cycles+1):
-            for j in range(self.loops-1,-1,-1):
-                vn_0 = M_x[i-1,-1-self.N*j] + (-M_x[i-1,-1-self.N*j]\
-                        +self.eta*(M_x[i-1,-1-self.N*j]+self.gamma*\
-                        J[i-1,-1-self.N*j])/(1+M_x[i-1,-1-self.N*j]+\
-                        self.gamma*J[i-1,-1-self.N*j]))*self.theta
-                M_x[i,0+(self.loops-1-j)*self.N] = vn_0
-            for j in range(1,self.N): 
-                for k in range(self.loops):
-                    vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                        self.eta*(M_x[i-1,j-1+self.N*k]+self.gamma* \
-                        J[i-1,j-1+self.N*k])/(1+M_x[i-1,j-1+self.N*k]+\
-                        self.gamma*J[i-1,j-1+self.N*k]))*self.theta
-                    M_x[i,j+self.N*k] = vn
-
-        
-        #Remove first row of zeroes
-        return M_x[1:]
-
-    def calculateSerial(self,u,m):
-        """
-        Calculate reservoir state with serial loading, i.e. x(t)*J(t)
+        Calculate reservoir state over duration u
 
         Args:
             u: input data
             m: mask array
-
-        Returns:
-            M_x: Matrix of reservoir history 
-        """
-
-        cycles = len(u)
-        
-        #Add extra layer to account for delay at t = 0
-        M_x = np.zeros((1+cycles,self.N*self.loops))
-        J = self.mask(u,m)
-        
-        #Add extra layer to match indexes with M_x
-        J = np.vstack((np.zeros((1,self.N*self.loops)),J))
-        
-        #Iteratively solve Mackey Glass Equation with Euler's Method
-        for i in range(1,cycles+1):
-            for j in range(self.loops-1,-1,-1):
-                vn_0 = M_x[i-1,-1-self.N*j] + (-M_x[i-1,-1-self.N*j]\
-                        +1.0*(1e-12+self.gamma*M_x[i-1,-1-self.N*j]*\
-                        J[i-1,-1-self.N*j])/(1+self.gamma*M_x[i-1,-1-self.N*j]*\
-                        J[i-1,-1-self.N*j]))*self.theta*\
-                        (self.loops-j)
-                M_x[i,0+(self.loops-1-j)*self.N] = vn_0
-            for j in range(1,self.N): 
-                for k in range(self.loops):
-                    vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                        1.0*(1e-12+self.gamma*M_x[i-1,j-1+self.N*k]* \
-                        J[i-1,j-1+self.N*k])/(1+self.gamma*M_x[i-1,j-1+\
-                        self.N*k]*J[i-1,j-1+self.N*k]))*self.theta
-                    M_x[i,j+self.N*k] = vn
-        
-        #Remove first row of zeroes
-        return M_x[1:]
-
-
-    def mutualCoupling(self,u,m):
-        """
-        Calculate reservoir with mutual coupling between (two) delay loops
-
-        Args:
-            u: input data
-            m: mask array
-
-        Returns:
-            M_x: Matrix of reservoir history
-        """
-
-        cycles = len(u)
-        
-        #Add extra layer to account for delay at t = 0
-        M_x = np.zeros((1+cycles,self.N*2))
-        J = self.mask(u,m)
-        
-        #Add extra layer to match indexes with M_x
-        J = np.vstack((np.zeros((1,self.N*2)),J))
-
-        #Iteratively solve Mackey Glass Equation with Euler's Method
-        for i in range(1,cycles+1):
-            for j in range(1,-1,-1):
-                vn_0 = M_x[i-1,-1-self.N*j] + ( -M_x[i-1,-1-self.N*j]\
-                        +self.eta*(M_x[i-1,-1-self.N*j]+\
-                        0.05*M_x[i-1,-1-self.N*(1-j)]+self.gamma*\
-                        J[i-1,-1-self.N*j])/(1+M_x[i-1,-1-self.N*j]+\
-                        0.05*M_x[i-1,-1-self.N*(1-j)]+\
-                        self.gamma*J[i-1,-1-self.N*j]))*self.theta*(2-j)
-                M_x[i,0+(self.loops-1-j)*self.N] = vn_0
-            for j in range(1,self.N): 
-                for k in range(2):
-                    vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                        self.eta*(M_x[i-1,j-1+self.N*k] \
-                        + 0.05*M_x[i-1,j-1+self.N*(1-k)] + self.gamma* \
-                        J[i-1,j-1+self.N*k])/(1+M_x[i-1,j-1+self.N*k]+\
-                        0.05*M_x[i-1,j-1+self.N*(1-k)] +\
-                        self.gamma*J[i-1,j-1+self.N*k]))*self.theta*(k+1)
-                    M_x[i,j+self.N*k] = vn
-        
-        #Remove first row of zeros
-        return M_x[1:]
-
-    def calculateTwo(self,u,m,r = 1.0):
-        """
-        Calculates Reservoir State over the duration of u, two delay loops with
-        different delay times but constant node spacing, both loops undergo
-        same number of cycles
-        
-        Args:
-            u: Input data
-            m: Mask array
-            r: Ratio of t2 to t1
-
-        Returns:
-            M_x: Matrix of reservoir history
-        """
-        
-        cycles = len(u)
-        
-        #Add extra layer to account for delay at t = 0
-        M_x = np.zeros((1+cycles,int(self.N*(1+r))))
-        J = self.mask(u,m)
-         
-        #Add extra layer to match indexes with M_x
-        J = np.vstack((np.zeros((1,int(np.round(self.N*(1+r))))),J))
-
-        #Iteratively solve Mackey Glass Equation with Euler's Method
-        for i in range(1,cycles+1):
-            for j in range(1,-1,-1):
-                vn_0 = M_x[i-1,-1-self.N*j] + (-M_x[i-1,-1-self.N*j]\
-                        +self.eta*(M_x[i-1,-1-self.N*j]+self.gamma*\
-                        J[i-1,-1-self.N*j])/(1+M_x[i-1,-1-self.N*j]+\
-                        self.gamma*J[i-1,-1-self.N*j]))*self.theta
-                M_x[i,0+(self.loops-1-j)*self.N] = vn_0
-            for k in range(2): 
-                if(k == 0):
-                    for j in range(self.N):
-                        vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                            self.eta*(M_x[i-1,j-1+self.N*k]+self.gamma* \
-                            J[i-1,j-1+self.N*k])/(1+M_x[i-1,j-1+self.N*k]+\
-                            self.gamma*J[i-1,j-1+self.N*k]))*self.theta
-                        M_x[i,j+self.N*k] = vn
-                else:
-                    for j in range(int(self.N*r)):
-                        vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                            self.eta*(M_x[i-1,j-1+self.N*k]+self.gamma* \
-                            J[i-1,j-1+self.N*k])/(1+M_x[i-1,j-1+self.N*k]+\
-                            self.gamma*J[i-1,j-1+self.N*k]))*self.theta
-                        M_x[i,j+self.N*k] = vn
-
-
-        
-        #Remove first row of zeroes
-        return M_x[1:,:400]
-
-
-    def calculateTwoCont(self,u,m,r = 2.0):
-        """
-        Calculates Reservoir State over the duration of u, two delay loops with
-        different delay times but constant node spacing, same mask length for
-        both loops
-        
-        Args:
-            u: Input data
-            m: Mask array
-            r: Ratio of t2 to t1
-
-        Returns:
-            M_x: Matrix of reservoir history
-        """
-        
-        cycles = len(u)
-        
-        #Add extra layer to account for delay at t = 0
-        #Increase second loop length by factor of r
-        M_x = np.zeros((1+cycles,self.N*(1+r)))
-        J = self.mask(u,m)
-       
-        #Add extra layer to match indexes with M_x
-        J = np.vstack((np.zeros((1,self.N*2)),J))
-
-        #Iteratively solve Mackey Glass Equation with Euler's Method
-        for i in range(1,cycles+1):
-            for j in range(1,-1,-1):
-                vn_0 = M_x[i-1,-1-self.N*j] + (-M_x[i-1,-1-self.N*j]\
-                        +self.eta*(M_x[i-1,-1-self.N*j]+self.gamma*\
-                        J[i-1,-1-self.N*j])/(1+M_x[i-1,-1-self.N*j]+\
-                        self.gamma*J[i-1,-1-self.N*j]))*self.theta
-                M_x[i,0+(self.loops-1-j)*self.N] = vn_0
-            for k in range(2): 
-                if(k == 0):
-                    for j in range(self.N):
-                        vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                            self.eta*(M_x[i-1,j-1+self.N*k]+self.gamma* \
-                            J[i-1,j-1+self.N*k])/(1+M_x[i-1,j-1+self.N*k]+\
-                            self.gamma*J[i-1,j-1+self.N*k]))*self.theta
-                        M_x[i,j+self.N*k] = vn
-                else:
-                    for j in range(self.N*2):
-                        vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                            self.eta*(M_x[i-1,j-1+self.N*k]+self.gamma* \
-                            J[i-1,(j-1)//r+self.N*k])/(1+M_x[i-1,j-1+self.N*k]+\
-                            self.gamma*J[i-1,(j-1)//r+self.N*k]))*self.theta
-                        M_x[i,j+self.N*k] = vn
-
-        
-        #Remove first row of zeroes
-        return M_x[1:,:400]
-
-
-    def calculateMGBit(self,u,m,bits):
-        """
-        Calculate rservoir state with Mackey-Glass activation function with 
-        finite bit precision
-
-        Args:
-            u: input array
-            m: mask array
-            bits: number of bit precisoni
+            bits: number of bit precision, np.inf for analog values
+            noise: noise amplitude in input
+            t: ratio of node interval to solver timestep
+            act: activation function to be used for nonlinear node
 
         Returns:
             M_x: matrix of reservoir history
         """
-        cycles = len(u)
         
-        #Add extra layer to account for delay at t = 0
-        M_x = np.zeros((1+cycles,self.N))
-        u_new = np.zeros(cycles)
-        for i in range(cycles):
-            u_new[i] = DelayReservoir.ADC(u[i],0,0.5,bits)
-        J = self.mask(u_new,m)
         
+        #Reshape input data with mask
+
+        J = self.mask(u,m)
+        cycles = J.shape[0]
+            
         #Add extra layer to match indexes with M_x
         J = np.vstack((np.zeros((1,self.N)),J))
-
-        #Iteratively solve differential equation with Euler's Method
-        for i in range(1,cycles+1):
-            for j in range(self.loops-1,-1,-1):
-                vn_0 = M_x[i-1,-1-self.N*j] + (-M_x[i-1,-1-self.N*j]\
-                        +self.eta*(DelayReservoir.ADC(M_x[i-1,-1-self.N*j],\
-                        -0.01,0.01,bits)+self.gamma*\
-                        J[i-1,-1-self.N*j])/(1+
-                        DelayReservoir.ADC(M_x[i-1,-1-self.N*j],-0.01,0.01,\
-                        bits) + \
-                        self.gamma*J[i-1,-1-self.N*j]))*self.theta
-                M_x[i,0+(self.loops-1-j)*self.N] = vn_0
-            for j in range(1,self.N): 
-                for k in range(self.loops):
-                    vn = M_x[i,j-1+self.N*k] + (-M_x[i,j-1+self.N*k] + \
-                        self.eta*(DelayReservoir.ADC(M_x[i-1,j-1+self.N*k],\
-                        -0.01,0.01,bits)+self.gamma* \
-                        J[i,j-1+self.N*k])/(1+DelayReservoir.ADC(\
-                        M_x[i-1,j-1+self.N*k],-0.01,0.01,bits)+\
-                        self.gamma*J[i,j-1+self.N*k]))*self.theta
-                    M_x[i,j+self.N*k] = DelayReservoir.ADC(vn,-0.01,0.01,bits)
-
+        J = J.flatten(order= 'C')
+        J = J.reshape((1,(1+cycles)*self.N),order = 'F')
+        M_x = np.zeros(J.shape)
+        MG_bot_vals = np.zeros(J.shape)         # Create container to store values of denominator 
+    
         
-        #Remove first row of zeroes
-        return M_x[1:]
+        #Select activation function
+        a = self.activationFunction(act)
 
+        #Iteratively solve differential equation with Euler's Method  
+        for i in range(1,(cycles+1)*self.N*t//1): 
+            vn = M_x[0,i-1]-M_x[0,i-1]*self.theta/t
 
+            if act == "wright":         # In the case that we want wright, take out the x(t) term by redefining vn
+                vn = M_x[0,i-1]
 
-    def ADC(V,V_low,V_high,bits):
+            arg = M_x[0,i-1-self.tau*t] 
+            
+            vn += self.eta*a(self.beta*arg+self.gamma*J[0,(i-1)//t]) * self.theta/t
+            M_x[0,i] = vn
+
+            MG_bot_vals[0,i] = self.beta*arg+self.gamma*J[0,(i-1)//t]  # Store the denominator values (without the "1+", this can be added in if needed for computation)
+        
+
+        #Reshape matrix
+        M_x_new = np.zeros((1+cycles,self.N*t))
+        MG_bot_new = np.zeros((1+cycles, self.N*t))  
+
+        # M_x_new[:,i*self.N:(i+1)*self.N] = \
+        #     M_x[0,i].reshape(1+cycles,self.N)         # Before M_x[i].reshape(1+cycles,self.N)  
+
+        M_x_new = M_x.reshape(1+cycles,self.N)
+        MG_bot_new = MG_bot_vals.reshape(1+cycles,self.N)
+         
+        #Remove first row of zeroes, select values at node spacing
+        return M_x_new[1:,0:self.N*t:t], MG_bot_new[1:,0:self.N*t:t]  
+
+    def activationFunction(self,func):
         """
-        Convert analog voltage to digital with bits # of bits
-
-        Args:
-            V: number to be converted
-            bits: bit precision
-            V_high: high end of voltage range
-            V_low: low end of voltage range
-
+        Choose and evaluate correspinding activation function (tanh,sin^2,
+        mackey-glass)
+        
+        args:
+            func: activation function type, either 'tanh', 'sin', or 'mg'
+            
         Returns:
-            b: bit representation of number
+            a: lambda function acting as activation function
         """
         
-        #Find bit that V is closest to
-        V_tot = V_high - V_low
-        Nb = np.around(((V-V_low)/V_tot)*2**bits)
-        b = Nb*(V_tot/2**bits)+V_low
-        
-        return b
+        #Return correct function, otherwise raise an exception
+        if(func == 'mg'):
+            return lambda x: x/(1+x)
+        elif (func == 'wright'):
+            return lambda x: x 
+        elif (func == 'hayes'):
+            return lambda x: x
+        else:
+            raise Exception('Not a valid activation function!')
