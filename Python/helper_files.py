@@ -1,14 +1,12 @@
 
-import numpy as np
 import random
-import multiprocessing
-import csv
-import time
-import pandas
-from Delay_Reservoir import DelayReservoir
-from joblib import Parallel, delayed
 
-from hyperopt import fmin, tpe, hp
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy import signal
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import train_test_split
+
 # from hyperopt import hp, tpe, fmin
 
 """
@@ -101,5 +99,112 @@ def cross_validate(alphas,x,x_test,target):
             best_train = y_input
     
     return best_nrmse,best_prediction,best_train
-        
-    
+
+
+def make_training_testing_set(num_waves=1000, test_percent=0.1, preload=False, write=False):
+    if not preload:
+        num_sin, num_saw, num_square = [num_waves // 3]*3
+        sin = lambda x,theta: np.sin(theta*x)
+        square = lambda x, theta: np.sign(theta*x)
+        sawtooth = lambda x, theta: signal.sawtooth(theta*x)
+        t = np.linspace(-5, 5, 500)
+        waves = []
+        y = []
+        funcs = [sin, sawtooth, square]
+        totals = [num_sin, num_saw, num_square]
+        for i in range(len(funcs)):
+            func = funcs[i]
+            for x in range(totals[i]):
+                y.append(i)
+                theta = np.random.uniform(0.001,5)
+                wave = func(t, theta)
+                for idx in range(len(wave)):
+                    noise = 0.02 * np.random.normal()
+                    if np.random.uniform(0,1) <= 0.5:
+                        wave[idx] += noise
+                    else:
+                        wave[idx] -= noise
+                waves.append(wave)
+        X = np.array(waves)
+        y = np.array(y)
+
+        if write:
+            x_total = np.concatenate((X,y))
+            # x_total = x_total.flatten(order='C')
+            file = open("data/sin_waves.txt", "w+")
+            for i in range(len(x_total)):
+                file.write("%f" % x_total[i] + "\n")
+            file.close()
+
+        return train_test_split(X, y, test_size = test_percent, random_state = 42)
+
+
+def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
+    if preload:
+        file1 = open("Data/Input_sequence.txt", "r")
+        file2 = open("Data/mask_2.txt", "r")
+        contents = file1.readlines()
+        contents2 = file2.readlines()
+        u = []
+        m = []
+        for i in range(1000):
+            u.append(float(contents[i][0:contents[i].find("\t")]))
+            if i < 400:
+                m.append(float(contents2[i][0:contents2[i].find("\n")]))
+        file1.close()
+        file2.close()
+        u = np.array(u)
+        m = np.array(m)
+        m = m[:N]  # Able to do preloaded data for all sorts of node sizes
+    # Randomly initialize u and m
+    else:
+        u = np.random.rand(train_length + test_length) / 2.
+        while NARMA_Diverges(u):
+            u = np.random.rand(train_length + test_length) / 2.
+        m = np.array([random.choice([-mask, mask]) for _ in range(N)])
+
+    target = NARMA_Generator(len(u), u)
+    return u, m, target
+
+
+def plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N):
+    plt.figure(1)
+    plt.plot(np.linspace(0, 1e-3 * train_length, N * train_length), x.flatten()[0:])
+    plt.xlabel('time [ms]')
+    plt.ylabel('x(t) [V]')
+    plt.figure(2)
+    plt.plot(y_test[50:], label='Prediction')
+    plt.plot(target[train_length + 50:], label='Target')
+    plt.title('NRMSE = %f' % NRMSE)
+    plt.legend()
+
+    plt.figure(2)
+    plt.plot(y_test[50:], label='Prediction')
+    plt.plot(target[train_length + 50:], label='Target')
+    plt.title('NRMSE = %f' % NRMSE)
+    plt.legend()
+
+    plt.figure(3)
+    plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
+             label="[beta * x(t) + gamma * j(t)] ^ 1")
+    plt.plot(np.linspace(0, N * u.shape[0], u.shape[0]), u.flatten()[0:], label="Input Narma Taks")
+    plt.xlabel("cycle * nodes")
+    plt.title("MG Denominator compared to NARMA Input")
+    plt.legend()
+
+    plt.figure(4)
+    plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
+             label="[beta * x(t) + gamma * j(t)] ^ 1")
+    plt.xlabel("cycle * Nodes")
+    plt.title("MG Denominator : [beta * x(t) + gamma * j(t)] ^ 1")
+
+    plt.show()
+
+
+def write_func(x, x_test):
+    x_total = np.concatenate((x, x_test))
+    x_total = x_total.flatten(order='C')
+    file1 = open("data/x_comparison .txt", "w+")
+    for i in range(400000):
+        file1.write("%f" % x_total[i] + "\n")
+    file1.close()
