@@ -3,11 +3,10 @@
 __author__ = "Philip Jacobson"
 __email__ = "philip_jacobson@berkeley.edu"
 
-import numpy as np
 import random
-from scipy import signal
-from sklearn.metrics.pairwise import polynomial_kernel
-from sklearn.metrics.pairwise import rbf_kernel
+
+import numpy as np
+
 
 ##########################################################################
 
@@ -16,7 +15,7 @@ class DelayReservoir():
     Class to perform Reservoir Computing using Delay-Based Architecture
     """
     
-    def __init__(self,N = 400,eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, fudge = 1):
+    def __init__(self, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, fudge = 1, power = 1):
         """
         Args:
             N:  Number of Virtual Nodes
@@ -34,6 +33,7 @@ class DelayReservoir():
         self.beta = beta
         self.tau = tau
         self.fudge = fudge
+        self.power = power
 
     def mask(self,u,m = None):
         """
@@ -143,7 +143,7 @@ class DelayReservoir():
         
         #Return correct function, otherwise raise an exception
         if(func == 'mg'):
-            return lambda x: x/(1+x)
+            return lambda x: x/((1+x)**self.power)
         elif (func == 'wright'):
             return lambda x: x 
         elif (func == 'hayes'):
