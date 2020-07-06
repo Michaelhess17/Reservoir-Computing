@@ -208,3 +208,16 @@ def write_func(x, x_test):
     for i in range(400000):
         file1.write("%f" % x_total[i] + "\n")
     file1.close()
+
+import heapq
+
+def margin(model, X):
+    preds = model.decision_function(X)
+    margins = []
+    for idx in range(len(preds)):
+        top, next = heapq.nlargest(2, preds[idx])
+        margins.append(top-next)
+    return margins
+
+
+
