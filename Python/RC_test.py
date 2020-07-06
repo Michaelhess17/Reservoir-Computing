@@ -12,7 +12,7 @@ import random
 import numpy as np
 from Delay_Reservoir import DelayReservoir
 from helper_files import cross_validate, make_training_testing_set, load_NARMA, \
-	plot_func, write_func
+	plot_func, write_func, margin
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import RidgeClassifier
 from tqdm import tqdm
@@ -120,11 +120,11 @@ def Classification_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_w
 	new_Xs = [[], []]
 	for k, data in enumerate(Xs):
 		for idx in tqdm(range(len(data))):
-			new_Xs[k].append(np.array(r1.calculate(data[idx], m, bits, t, activate)).flatten())
+			new_Xs[k].append(np.array(r1.calculate(data[idx], m, bits, t, activate))[:,-1])
 	new_Xs = np.array(new_Xs)
 	clf.fit(new_Xs[0], y_train)
 
-	return clf.score(new_Xs[1], y_test)
+	return [clf.score(new_Xs[1], y_test), np.mean(margin(clf, X_test))]
 
 
 def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R"):
@@ -170,7 +170,7 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R"):
 			gamma=gamma,
 			tau=max_Tau,
 			bits=np.inf,
-			num_waves=333,
+			num_waves=100,
 			test_size=0.1,
 			theta=theta,
 			preload=False,
@@ -206,4 +206,7 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R"):
 #     theta = 0.2
 #     )
 
+
+# print(run_test(eta=0.35, max_Tau=400, gamma=0.5, activation='hayes', type="C"))
 # print(run_test(eta=0.35, max_Tau=400, gamma=0.05, activation='mg', type="C"))
+
