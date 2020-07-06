@@ -1,7 +1,7 @@
 import numpy as np
 import seaborn as sns
 from Delay_Reservoir import DelayReservoir
-from RC_test import run_test, ml_test_hayes, NARMA_Test
+from RC_test import run_test, NARMA_Test
 from hyperopt import tpe, hp, fmin
 from matplotlib import pyplot as plt
 
@@ -92,7 +92,7 @@ def mg_hayes_comp():
 	# x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
 	# Hayes portion, collect output
-	activate = 'hayes'
+	activate = 'mod_hayes'
 	x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)
 	# x_hayes_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
@@ -146,7 +146,7 @@ def ml_test_hayes(param):
 		tau=N,
 		activate='hayes',
 		theta=theta
-	) for _ in range(3)])
+	)[0] for _ in range(3)])
 
 
 def hyperopt_grad_hayes():

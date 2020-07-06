@@ -58,9 +58,14 @@ def NARMA_Test(test_length=800, train_length=800,
 
 	x_test_bot = r1.calculate(u[train_length:], m, bits, t, activate)[1]
 
+    # if fudge / eta >= 1 and act == "hayes":
+    #     NRMSE = 1
+    #     return NRMSE
+
+
 	# Train using Ridge Regression with hyperparameter tuning
 	if cv:
-		NRMSE, y_test, y_input = cross_validate(alphas=np.logspace(-20, 5, 16), x=x, x_test=x_test, target=target)
+	    NRMSE, y_test, y_input = cross_validate(alphas=np.logspace(-20, 5, 16), x=x, x_test=x_test, target=target)
 	else:
 		clf = Ridge(alpha=0)
 		clf.fit(x, target[:train_length])
@@ -190,15 +195,15 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R"):
 #     test_length = 800,
 #     train_length = 3200,
 #     gamma = 0.48707341674880045,
-#     plot = False,
+#     plot = True,
 #     N = 317,
-#     eta = 0.9615229252495553
+#     eta = 0.9615229252495553,
 #     bits = np.inf,
 #     preload = False,
 #     beta = 0.408835328209339, 
-#     tau = x,
+#     tau = 317,
 #     activate = 'hayes',
-#     theta = theta
+#     theta = 0.2
 #     )
 
-print(run_test(eta=0.35, max_Tau=400, gamma=0.05, activation='mg', type="C"))
+# print(run_test(eta=0.35, max_Tau=400, gamma=0.05, activation='mg', type="C"))
