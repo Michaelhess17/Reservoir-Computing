@@ -69,6 +69,7 @@ class DelayReservoir():
             noise: noise amplitude in input
             t: ratio of node interval to solver timestep
             act: activation function to be used for nonlinear node
+            no_act_res: Return, in addition to regular solution, the base vn for each series
 
         Returns:
             M_x: matrix of reservoir history
@@ -148,5 +149,7 @@ class DelayReservoir():
             return lambda x: x 
         elif (func == 'hayes'):
             return lambda x: x
+        elif (func == 'mod_hayes'):
+            return lambda x: x/(1+round(float(np.random.rand(1)), 3))
         else:
             raise Exception('Not a valid activation function!')

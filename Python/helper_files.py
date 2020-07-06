@@ -89,6 +89,7 @@ def cross_validate(alphas,x,x_test,target):
         clf.fit(x,target[:len(x)])
         y_test = clf.predict(x_test)
         y_input = clf.predict(x)
+        
         NRMSE = np.sqrt(np.mean(np.square(y_test[50:]-target[len(x)+50:]))/\
             np.var(target[len(x)+50:]))
         
