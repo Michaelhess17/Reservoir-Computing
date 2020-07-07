@@ -84,18 +84,27 @@ def mg_hayes_comp():
 	u = np.array(u)
 	m = np.array(m)
 
-	# MG portion, collect output
+	### MG portion, collect output
 	activate = 'mg'
-	r1 = DelayReservoir(N=400, eta=1, gamma=0.05, theta=0.2, \
-	                    beta=1, tau=400)
+	np.random.seed(10)			# Reset the seed
+	N = 509			# # o' nodes for optimal MG performance
+	r1 = DelayReservoir(N=N, eta=0.94, gamma=0.28, theta=0.834, \
+	                    beta=0.74, tau=N)
+	m = np.random.choice([0.1,-0.1], [1,N])			# Tailor the mask to the number of nodes
+	m = m.reshape(N,)
 	x_mg, vn_mg = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)  # Takes the actual output
 	# x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
-	# Hayes portion, collect output
+	### Hayes portion, collect output
+	np.random.seed(10)			# Reset the seed
+	N = 400			# Redefine the # o' Nodes for optimal Hayes
+	r1 = DelayReservoir(N=N, eta=0.94, gamma=0.28, theta=0.834, \
+	    				beta=0.74, tau=N)
 	activate = 'mod_hayes'
+	m = np.random.choice([0.1,-0.1], [1,N])
+	m = m.reshape(N,)
 	x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)
 	# x_hayes_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
-
 	# Flatten the values
 	x_mg = x_mg.flatten()
 	x_hayes = x_hayes.flatten()
@@ -119,7 +128,6 @@ def mg_hayes_comp():
 	plt.legend()
 
 	plt.show()
-
 
 def ml_test_hayes(param):
 	"""
@@ -148,7 +156,6 @@ def ml_test_hayes(param):
 		theta=theta
 	)[0] for _ in range(3)])
 
-
 def hyperopt_grad_hayes():
 	"""
 	calls the fmin
@@ -162,14 +169,13 @@ def hyperopt_grad_hayes():
 			# 'N': hp.randint('N',800),
 			'theta': hp.uniform('theta', 0, 1),
 			'beta': hp.uniform('beta', 0, 1),
-			'hayes_param': hp.uniform('hayes_param', -1, 0)
+			'hayes_param': hp.uniform('hayes_param', 0, 1)
 		},
 		algo=tpe.suggest,
 		max_evals=100
 	)
 
 	print(best)
-
 
 def ml_test_wright(param):
 	"""
@@ -196,8 +202,8 @@ def ml_test_wright(param):
 		theta=theta
 	) for _ in range(3)])
 
-
 def hyperopt_grad_wright():
+
 	"""
 	calls the fmin
 	"""
@@ -217,6 +223,50 @@ def hyperopt_grad_wright():
 
 	print(best)
 
+def ml_test_mg(param):
+	"""
+	Sets up 'function' to minimize.
+	Declares variables to hyperopt.
+	Returns the mean NRMSE of 3 NARMA10 tasks
+	"""
+	gamma, eta, N, theta, beta = \
+		param['gamma'], param['eta'], param['N'], \
+		param['theta'], param['beta']
+
+	return np.mean([NARMA_Test(
+		test_length=800,
+		train_length=3200,
+		gamma=gamma,
+		plot=False,
+		N=N,
+		eta=eta,
+		bits=np.inf,
+		preload=False,
+		beta=beta,
+		tau=N,
+		activate='mg',
+		theta=theta
+	) for _ in range(3)])
+
+def hyperopt_grad_mg():
+	"""
+	calls the fmin
+	"""
+	best = fmin(
+		fn=ml_test_mg,
+		space={
+			# 'x': hp.randint('x',800),
+			'gamma': hp.uniform('gamma', 0.01, 2),
+			'eta': hp.uniform('eta', 0, 1),
+			'N': hp.randint('N', 800),
+			'theta': hp.uniform('theta', 0.0001, 1),
+			'beta': hp.uniform('beta', 0, 1)
+		},
+		algo=tpe.suggest,
+		max_evals=100
+	)
+
+	print(best)
 ##### TESTS #####
 
 #### mg_hayes_comp tests ####
@@ -225,9 +275,7 @@ mg_hayes_comp()
 #### Grid search tests ####
 # wright_grid_search(parameter_searched="eta_gamma", activation = "hayes")
 
-
-
-
 #### Hyperopt Tests ####
 # hyperopt_grad_wright()
 # hyperopt_grad_hayes()
+# hyperopt_grad_mg()

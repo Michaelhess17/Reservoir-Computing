@@ -22,9 +22,9 @@ from tqdm import tqdm
 
 
 def NARMA_Test(test_length=800, train_length=800,
-               plot=True, N=400, eta=0.4, gamma=0.05, tau=400, fudge=1,
-               bits=np.inf, preload=False, write=False, mask=0.1, activate='mg',
-               cv=False, beta=1.0, t=1, theta=0.2):
+			   plot=True, N=400, eta=0.4, gamma=0.05, tau=400, fudge=1,
+			   bits=np.inf, preload=False, write=False, mask=0.1, activate='mg',
+			   cv=False, beta=1.0, t=1, theta=0.2, no_act_res = False):
 	"""
 	Args:
 		test_length: length of testing data
@@ -50,22 +50,21 @@ def NARMA_Test(test_length=800, train_length=800,
 	u, m, target = load_NARMA(preload, train_length, test_length, mask, N)
 
 	# Instantiate Reservoir, feed in training and predictiondatasets
-	r1 = DelayReservoir(N=N, eta=eta, gamma=gamma, theta=theta,
-	                    beta=beta, tau=tau, fudge=fudge)
-	x = r1.calculate(u[:train_length], m, bits, t, activate)[0]
+	r1 = DelayReservoir(N=N, eta=eta, gamma=gamma, theta=theta,beta=beta, tau=tau, fudge=fudge)
+	x = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res = no_act_res)#[0]
 	# Is this correct? It looks like x_test and x_test_bot are defined as the same thing
-	x_test = r1.calculate(u[train_length:], m, bits, t, activate)[1]
+	x_test = r1.calculate(u[train_length:], m, bits, t, activate, no_act_res = no_act_res)#[0]                # Changed from [1] to [0]
 
-	x_test_bot = r1.calculate(u[train_length:], m, bits, t, activate)[1]
-
-    # if fudge / eta >= 1 and act == "hayes":
-    #     NRMSE = 1
-    #     return NRMSE
-
+	if no_act_res == True:
+		x_test_bot = r1.calculate(u[train_length:], m, bits, t, activate, no_act_res = no_act_res)[1]
+	# if fudge / eta >= 1 and act == "hayes":
+	#     NRMSE = 1
+	#     return NRMSE
+	
 
 	# Train using Ridge Regression with hyperparameter tuning
 	if cv:
-	    NRMSE, y_test, y_input = cross_validate(alphas=np.logspace(-20, 5, 16), x=x, x_test=x_test, target=target)
+		NRMSE, y_test, y_input = cross_validate(alphas=np.logspace(-20, 5, 16), x=x, x_test=x_test, target=target)
 	else:
 		clf = Ridge(alpha=0)
 		clf.fit(x, target[:train_length])
@@ -78,16 +77,19 @@ def NARMA_Test(test_length=800, train_length=800,
 	# Write to File
 	if write:
 		write_func(x, x_test)
+	
+	if not no_act_res:
+		x_test_bot = 0			# If I don't want to find the x(t)-x(t-tau) term, set flag before plotting
 
 	# Plot predicted Time Series
 	if plot:
-		plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, test_length, N)
+			plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N)
 
 	return NRMSE, x_test_bot
 
 
 def Classification_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_waves=1000, test_size=0.1,
-                        preload=False, write=False, mask=0.1, activate='mg', beta=1.0, power=7, t=1, theta=0.2):
+						preload=False, write=False, mask=0.1, activate='mg', beta=1.0, power=7, t=1, theta=0.2):
 	"""
 	Args:
 		N: number of virtual nodes
@@ -109,7 +111,7 @@ def Classification_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_w
 		Accuracy of Ridge Model on Testing Data
 	"""
 	X_train, X_test, y_train, y_test = make_training_testing_set(num_waves=num_waves, test_percent=test_size,
-	                                                             preload=preload, write=write)
+																 preload=preload, write=write)
 
 	clf = RidgeClassifier(alpha=0)
 	m = np.array([random.choice([-mask, mask]) for i in range(N)])
@@ -200,10 +202,28 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R"):
 #     eta = 0.9615229252495553,
 #     bits = np.inf,
 #     preload = False,
+#     cv = True,
 #     beta = 0.408835328209339, 
 #     tau = 317,
 #     activate = 'hayes',
 #     theta = 0.2
 #     )
+
+# NARMA_Test(
+# 	test_length = 800,
+# 	train_length = 800,
+# 	gamma = 0.28,
+# 	plot = True,
+# 	N = 509,
+# 	eta = 0.94,
+# 	bits = np.inf,
+# 	preload = False,
+# 	cv = True,
+# 	beta = 0.74, 
+# 	tau = 400,
+# 	activate = 'mg',
+# 	theta = 0.83,
+# 	no_act_res = False
+# 	)
 
 # print(run_test(eta=0.35, max_Tau=400, gamma=0.05, activation='mg', type="C"))
