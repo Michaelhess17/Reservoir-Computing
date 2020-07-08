@@ -157,6 +157,12 @@ def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
         u = np.array(u)
         m = np.array(m)
         m = m[:N]  # Able to do preloaded data for all sorts of node sizes
+
+    if N > 400:         # If you want more than 400 nodes:
+        np.random.seed(10)          # Resets the seed so behaves the same
+        m = np.random.choice([0.1,-0.1], [1,N])         # Tailor the mask to the number of nodes
+        m = m.reshape(N,)
+
     # Randomly initialize u and m
     else:
         u = np.random.rand(train_length + test_length) / 2.

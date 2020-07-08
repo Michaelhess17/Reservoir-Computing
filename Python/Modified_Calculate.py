@@ -1,62 +1,9 @@
-#!/usr/bin/env python3
-
-__author__ = "Philip Jacobson"
-__email__ = "philip_jacobson@berkeley.edu"
-
-import random
-
+from Delay_Reservoir import DelayReservoir
 import numpy as np
 
+t = DelayReservoir()
 
-##########################################################################
-
-class DelayReservoir():
-	"""
-	Class to perform Reservoir Computing using Delay-Based Architecture
-	"""
-	
-	def __init__(self, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, fudge = 1, power = 1):
-		"""
-		Args:
-			N:  Number of Virtual Nodes
-			eta: Feedback gain
-			gamma: Input gain
-			theta: Distance between virtual nodes
-			beta: Driver gain 
-			tau: Ratio of loop length to node spacing for each loop
-		"""
-		
-		self.N = N
-		self.eta = eta
-		self.gamma = gamma
-		self.theta = theta
-		self.beta = beta
-		self.tau = tau
-		self.fudge = fudge
-		self.power = power
-
-	def mask(self,u,m = None):
-		"""
-		Args:
-			u: Input data
-			m: Mask array
-
-		Returns:
-			J: Multiplexed (masked) data
-		"""
-
-			
-		if len(m.shape) == 1:
-			
-			if m.all() == None:
-				m = np.array([random.choice([-0.1,0.1]) for i in range(self.N)])
-			
-			u = np.reshape(u,(-1,1))
-			m = np.reshape(m,(1,-1))
-			
-			return u@m
-		else:
-			return (m@u).T
+class mod_Delay_Res(DelayReservoir):
 
 	def calculate(self,u,m,bits,t,act,no_act_res = False):
 		"""
@@ -111,8 +58,13 @@ class DelayReservoir():
 
 		M_x_new = M_x.reshape(1+cycles,self.N)
 
-
 		if no_act_res:
+
+			# Create status containers
+			Node_calced = []            # Stores when the node was calculated
+			Jt_store = []           # Stores the input at ^
+			x_t_store = []
+			x_tau_store = []           # Stores x(t-tau) at ^
 
 			# Loop through and solve no_activation portions
 			for i in range(1,(cycles+1)*self.N*t//1): 
@@ -122,7 +74,11 @@ class DelayReservoir():
 				vn_no_act += self.eta*(self.beta*arg+self.gamma*J[0,(i-1)//t]) * self.theta/t
 
 				if vn_no_act > 10:
-					raise ValueError("vn_no_act went crazy! It's INFFIINITE")
+					Node_calced.append(len(Mx_no_act)+1)
+					Jt_store.append(J[0,(i-1)//t])
+					x_t_store.append(Mx_no_act[0,i-1])
+					x_tau_store.append(arg)
+
 				Mx_no_act[0,i] = vn_no_act  # Store the denominator values (without the "1+", this can be added in if needed for computation)
 
 			# Reshape Matrix
@@ -135,26 +91,3 @@ class DelayReservoir():
 		#Remove first row of zeroes, select values at node spacing
 		return M_x_new[1:,0:self.N*t:t]
 
-	def activationFunction(self,func):
-		"""
-		Choose and evaluate correspinding activation function (tanh,sin^2,
-		mackey-glass)
-		
-		args:
-			func: activation function type, either 'tanh', 'sin', or 'mg'
-			
-		Returns:
-			a: lambda function acting as activation function
-		"""
-		
-		#Return correct function, otherwise raise an exception
-		if(func == 'mg'):
-			return lambda x: x/((1+x)**self.power)
-		elif (func == 'wright'):
-			return lambda x: x 
-		elif (func == 'hayes'):
-			return lambda x: x
-		elif (func == 'mod_hayes'):
-			return lambda x: x/(1+round(float(np.random.rand(1)), 3))
-		else:
-			raise Exception('Not a valid activation function!')

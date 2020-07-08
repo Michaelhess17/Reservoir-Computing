@@ -5,6 +5,8 @@ from RC_test import run_test, NARMA_Test
 from hyperopt import tpe, hp, fmin
 from matplotlib import pyplot as plt
 
+from Modified_Calculate import mod_Delay_Res
+
 
 def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma=0.05, parameter_searched="theta",
                        activation="hayes"):
@@ -88,23 +90,23 @@ def mg_hayes_comp():
 	activate = 'mg'
 	np.random.seed(10)			# Reset the seed
 	N = 509			# # o' nodes for optimal MG performance
-	r1 = DelayReservoir(N=N, eta=0.94, gamma=0.28, theta=0.834, \
+	r1 = mod_Delay_Res(N=N, eta=0.94, gamma=0.28, theta=0.834, \
 	                    beta=0.74, tau=N)
 	m = np.random.choice([0.1,-0.1], [1,N])			# Tailor the mask to the number of nodes
-	m = m.reshape(N,)
-	x_mg, vn_mg = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)  # Takes the actual output
-	# x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
+	m1 = m.reshape(N,)
+	x_mg, vn_mg = r1.calculate(u[:train_length], m1, bits, t, activate, no_act_res=True)  # Takes the actual output
+
 
 	### Hayes portion, collect output
 	np.random.seed(10)			# Reset the seed
 	N = 400			# Redefine the # o' Nodes for optimal Hayes
-	r1 = DelayReservoir(N=N, eta=0.94, gamma=0.28, theta=0.834, \
+	r1 = mod_Delay_Res(N=N, eta=0.94, gamma=0.28, theta=0.834, \
 	    				beta=0.74, tau=N)
-	activate = 'mod_hayes'
+	activate = 'hayes'
 	m = np.random.choice([0.1,-0.1], [1,N])
 	m = m.reshape(N,)
 	x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)
-	# x_hayes_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
+
 	# Flatten the values
 	x_mg = x_mg.flatten()
 	x_hayes = x_hayes.flatten()
@@ -112,20 +114,33 @@ def mg_hayes_comp():
 	vn_mg = vn_mg.flatten()
 	vn_hayes = vn_hayes.flatten()
 
+	u = np.reshape(u,(-1,1))
+	m1 = np.reshape(m1,(1,-1))
+	masked_narma = u@m1
+	masked_narma = masked_narma.flatten()
+
 	# Plot the data
 	plt.figure(1)
-	plt.plot(x_mg, label="mackey-glass")
-	plt.plot(x_hayes, label="hayes")
-	plt.xlabel("cycle * Nodes")
-	plt.title("Raw Mg vs Hayes Ouputs with Same NARMA Input")
+	plt.plot(x_mg, label="Mackey-Glass")
+	plt.plot(x_hayes, label="Hayes")
+	plt.xlabel("the nth node calculated")
+	plt.title("Raw Mg vs Hayes Ouput given same NARMA Input")
 	plt.legend()
 
 	plt.figure(2)
-	plt.plot(vn_mg, label="mackey-glass vn")
-	plt.plot(vn_hayes, label="hayes vn")
-	plt.xlabel("cycle * Nodes")
-	plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
+	plt.plot(masked_narma, label = "Masked Narma Input")
+	plt.plot(x_mg, label="Mackey-Glass")
+	plt.plot(x_hayes, label="Hayes")
+	plt.xlabel("the nth node calculated")
+	plt.title("Raw Mg vs Hayes Ouput given same NARMA Input")
 	plt.legend()
+
+	# plt.figure(2)
+	# plt.plot(vn_mg, label="Mackey-Glass, no activation function")
+	# plt.plot(vn_hayes, label="Hayes, no activation function")
+	# plt.xlabel("the nth node calculated")
+	# plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
+	# plt.legend()
 
 	plt.show()
 
@@ -279,3 +294,4 @@ mg_hayes_comp()
 # hyperopt_grad_wright()
 # hyperopt_grad_hayes()
 # hyperopt_grad_mg()
+
