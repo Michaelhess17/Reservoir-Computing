@@ -2,10 +2,10 @@ from Delay_Reservoir import DelayReservoir
 import numpy as np
 
 class mod_Delay_Res(DelayReservoir):
+	def __init__(self, k1 = 1, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, power = 1):
+		self.k1 = k1			# Term in front of x(t)
+		super().__init__( N, eta, gamma, theta, beta, tau, power)
 
-	def init(self, x_t_term):
-		self.x_t_term = x_t_term			# Term in front of x(t)
-		super().__init__()
 
 	def calculate(self,u,m,bits,t,act,no_act_res = False):
 		"""
@@ -42,7 +42,7 @@ class mod_Delay_Res(DelayReservoir):
 
 		#Iteratively solve differential equation with Euler's Method  
 		for i in range(1,(cycles+1)*self.N*t//1): 
-			vn = M_x[0,i-1]-M_x[0,i-1]*self.theta/t
+			vn = M_x[0,i-1]- (self.k1 * M_x[0,i-1])*self.theta/t
 			arg = 0
 			if act == "wright":         # In the case that we want wright, take out the x(t) term by redefining vn
 				vn = M_x[0,i-1]
@@ -71,7 +71,7 @@ class mod_Delay_Res(DelayReservoir):
 			for i in range(1,(cycles+1)*self.N*t//1): 
 				arg = Mx_no_act[0,i-1-self.tau*t]
 
-				vn_no_act = Mx_no_act[0,i-1]-Mx_no_act[0,i-1]*self.theta/t
+				vn_no_act = Mx_no_act[0,i-1]- (self.k1* Mx_no_act[0,i-1])*self.theta/t
 				vn_no_act += self.eta*(self.beta*arg+self.gamma*J[0,(i-1)//t]) * self.theta/t
 
 				if vn_no_act > 10:
@@ -91,4 +91,3 @@ class mod_Delay_Res(DelayReservoir):
 
 		#Remove first row of zeroes, select values at node spacing
 		return M_x_new[1:,0:self.N*t:t]
-

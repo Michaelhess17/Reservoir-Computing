@@ -45,21 +45,22 @@ def NARMA_Test(test_length=800, train_length=800,
 	Returns:
 		NRMSE: Normalized Root Mean Square Error
 	"""
-
+	if activate == "Hayes" and self.x_t_term / self.eta:
+		NRSME = 1
+		x_test_bot = 0
+		return NRSME, x_test_bot			# Should the parameters be those that put Hayes in unstable territory, 
+			
 	# Import u, m, and target
 	u, m, target = load_NARMA(preload, train_length, test_length, mask, N)
 
 	# Instantiate Reservoir, feed in training and predictiondatasets
-	r1 = DelayReservoir(N=N, eta=eta, gamma=gamma, theta=theta,beta=beta, tau=tau, fudge=fudge)
+	r1 = DelayReservoir(N=N, eta=eta, gamma=gamma, theta=theta,beta=beta, tau=tau)
 	x = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res = no_act_res)#[0]
 	# Is this correct? It looks like x_test and x_test_bot are defined as the same thing
 	x_test = r1.calculate(u[train_length:], m, bits, t, activate, no_act_res = no_act_res)#[0]                # Changed from [1] to [0]
 
 	if no_act_res == True:
 		x_test_bot = r1.calculate(u[train_length:], m, bits, t, activate, no_act_res = no_act_res)[1]
-	# if fudge / eta >= 1 and act == "hayes":
-	#     NRMSE = 1
-	#     return NRMSE
 	
 
 	# Train using Ridge Regression with hyperparameter tuning
@@ -212,17 +213,17 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R"):
 # NARMA_Test(
 # 	test_length = 800,
 # 	train_length = 800,
-# 	gamma = 0.28,
+# 	gamma = 0.20,
 # 	plot = True,
-# 	N = 509,
-# 	eta = 0.94,
+# 	N = 400,
+# 	eta = 1,
 # 	bits = np.inf,
 # 	preload = False,
 # 	cv = True,
-# 	beta = 0.74, 
+# 	beta = 1, 
 # 	tau = 400,
-# 	activate = 'mg',
-# 	theta = 0.83,
+# 	activate = 'hayes',
+# 	theta = 0.2,
 # 	no_act_res = False
 # 	)
 

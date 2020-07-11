@@ -158,10 +158,10 @@ def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
         m = np.array(m)
         m = m[:N]  # Able to do preloaded data for all sorts of node sizes
 
-    if N > 400:         # If you want more than 400 nodes:
-        np.random.seed(10)          # Resets the seed so behaves the same
-        m = np.random.choice([0.1,-0.1], [1,N])         # Tailor the mask to the number of nodes
-        m = m.reshape(N,)
+        if N > 400:         # If you want more than 400 nodes:
+            np.random.seed(10)          # Resets the seed so behaves the same
+            m = np.random.choice([0.1,-0.1], [1,N])         # Tailor the mask to the number of nodes
+            m = m.reshape(N,)
 
     # Randomly initialize u and m
     else:
@@ -185,6 +185,9 @@ def plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N):
         plt.plot(y_test[50:], label='Prediction')
         plt.plot(target[train_length + 50:], label='Target')
         plt.title('NRMSE = %f' % NRMSE)
+
+        plt.xlabel('N =400, eta = 0.75, gamma = 0.05, tau = 400, beta =1,theta = 0.2, k1 = 1, act = mg')         # Must be Changed Manually....
+        
         plt.legend()
 
     else:

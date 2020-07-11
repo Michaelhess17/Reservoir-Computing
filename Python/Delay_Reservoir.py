@@ -11,11 +11,12 @@ import numpy as np
 ##########################################################################
 
 class DelayReservoir():
+
 	"""
 	Class to perform Reservoir Computing using Delay-Based Architecture
 	"""
 	
-	def __init__(self, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, fudge = 1, power = 1):
+	def __init__(self, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, power = 1):
 		"""
 		Args:
 			N:  Number of Virtual Nodes
@@ -32,7 +33,6 @@ class DelayReservoir():
 		self.theta = theta
 		self.beta = beta
 		self.tau = tau
-		self.fudge = fudge
 		self.power = power
 
 	def mask(self,u,m = None):
@@ -136,6 +136,7 @@ class DelayReservoir():
 		return M_x_new[1:,0:self.N*t:t]
 
 	def activationFunction(self,func):
+
 		"""
 		Choose and evaluate correspinding activation function (tanh,sin^2,
 		mackey-glass)
@@ -158,3 +159,5 @@ class DelayReservoir():
 			return lambda x: x/(1+round(float(np.random.rand(1)), 3))
 		else:
 			raise Exception('Not a valid activation function!')
+
+

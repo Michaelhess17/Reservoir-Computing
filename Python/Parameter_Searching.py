@@ -5,11 +5,15 @@ from RC_test import run_test, NARMA_Test
 from hyperopt import tpe, hp, fmin
 from matplotlib import pyplot as plt
 
-from Modified_Calculate import mod_Delay_Res
+from ray import tune
+from ray.tune.schedulers import AsyncHyperBandScheduler
+from ray.tune.suggest.hyperopt import HyperOptSearch
+
+from Modified_Delay_Reservoir import mod_Delay_Res
 
 
 def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma=0.05, parameter_searched="theta",
-                       activation="hayes"):
+					   activation="hayes"):
 	"""
 	Runs a grid search manipulating theta for the Wright equation. max_tau is the longest tau possible at wright_k.
 	Holds all else constant and varies theta. Next ones will have to vary gamma.
@@ -58,7 +62,7 @@ def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma
 
 		# plot data
 		ax = sns.heatmap(eg_output, cmap='coolwarm', xticklabels=np.round_(gamma_range, 4),
-		                 yticklabels=np.round_(k_range, 4))
+						 yticklabels=np.round_(k_range, 4))
 		ax.set(xlabel="gamma", ylabel="k", title="Wright simulation results for NARMA task")
 		plt.show()
 
@@ -91,7 +95,7 @@ def mg_hayes_comp():
 	np.random.seed(10)			# Reset the seed
 	N = 509			# # o' nodes for optimal MG performance
 	r1 = mod_Delay_Res(N=N, eta=0.94, gamma=0.28, theta=0.834, \
-	                    beta=0.74, tau=N)
+						beta=0.74, tau=N)
 	m = np.random.choice([0.1,-0.1], [1,N])			# Tailor the mask to the number of nodes
 	m1 = m.reshape(N,)
 	x_mg, vn_mg = r1.calculate(u[:train_length], m1, bits, t, activate, no_act_res=True)  # Takes the actual output
@@ -100,8 +104,8 @@ def mg_hayes_comp():
 	### Hayes portion, collect output
 	np.random.seed(10)			# Reset the seed
 	N = 400			# Redefine the # o' Nodes for optimal Hayes
-	r1 = mod_Delay_Res(N=N, eta=0.94, gamma=0.28, theta=0.834, \
-	    				beta=0.74, tau=N)
+	r1 = mod_Delay_Res(N=N, eta=0.401, gamma=0.531, theta=0.2, \
+						beta=0.7, tau=N)
 	activate = 'hayes'
 	m = np.random.choice([0.1,-0.1], [1,N])
 	m = m.reshape(N,)
@@ -135,12 +139,12 @@ def mg_hayes_comp():
 	plt.title("Raw Mg vs Hayes Ouput given same NARMA Input")
 	plt.legend()
 
-	# plt.figure(2)
-	# plt.plot(vn_mg, label="Mackey-Glass, no activation function")
-	# plt.plot(vn_hayes, label="Hayes, no activation function")
-	# plt.xlabel("the nth node calculated")
-	# plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
-	# plt.legend()
+	plt.figure(3)
+	plt.plot(vn_mg, label="Mackey-Glass, no activation function")
+	plt.plot(vn_hayes, label="Hayes, no activation function")
+	plt.xlabel("the nth node calculated")
+	plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
+	plt.legend()
 
 	plt.show()
 
@@ -189,6 +193,8 @@ def hyperopt_grad_hayes():
 		algo=tpe.suggest,
 		max_evals=100
 	)
+
+	
 
 	print(best)
 
@@ -282,10 +288,70 @@ def hyperopt_grad_mg():
 	)
 
 	print(best)
+
+def ray_test_hayes(param):
+	"""
+	Sets up 'function' to minimize.
+	Declares variables to hyperopt.
+	Passes the mean NRMSE of 3 NARMA10 tasks into Ray for Async optomization
+	
+	"""
+	gamma, eta, beta, theta, hayes_param = \
+		param['gamma'], param['eta'], param['beta'], param['theta'], param['hayes_param']
+
+	N = 400  # Number of Nodes
+
+	mean_NRMSE = np.mean([NARMA_Test(
+		test_length=1000,
+		train_length=3200,
+		gamma=gamma,
+		plot=False,
+		N=N,
+		eta=eta,
+		bits=np.inf,
+		preload=False,
+		beta=beta,
+		fudge=hayes_param,
+		tau=N,
+		activate='hayes',
+		theta=theta
+	)[0] for _ in range(3)])
+
+	ray.report(mean_loss = intermediate_score)
+	time.sleep(0.1)			# As seen in example doc
+
+
+def ray_hayes():
+	ray.init(configure_logging = False)
+
+	space={
+		# 'x': hp.randint('x',800),
+		'gamma': hp.uniform('gamma', 0.01, 3),
+		'eta': hp.uniform('eta', 0, 1),
+		# 'N': hp.randint('N',800),
+		'theta': hp.uniform('theta', 0, 1),
+		'beta': hp.uniform('beta', 0, 1),
+		'hayes_param': hp.uniform('hayes_param', 0, 1)
+	},
+
+	algo = HyperOptSearch(
+		space,
+		metric = "mean_loss" #What do I fill out here? Filling it with Mean_loss for now
+	)
+
+	scheduler = AsyncHyperBandScheduler(metric = "mean_loss" # What should i put? Filling with mean_loss for now
+													,mode = "min")
+	tune.run(ray_test_hayes, search_alg = algo, scheduler = scheduler)
+
+
+
 ##### TESTS #####
 
+#### Ray tests ####
+ray_hayes()
+
 #### mg_hayes_comp tests ####
-mg_hayes_comp()
+# mg_hayes_comp()
 
 #### Grid search tests ####
 # wright_grid_search(parameter_searched="eta_gamma", activation = "hayes")
