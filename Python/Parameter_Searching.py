@@ -5,11 +5,15 @@ from RC_test import run_test, NARMA_Test
 from hyperopt import tpe, hp, fmin
 from matplotlib import pyplot as plt
 
+from tabulate import tabulate
+
+import ray
 from ray import tune
 from ray.tune.schedulers import AsyncHyperBandScheduler
 from ray.tune.suggest.hyperopt import HyperOptSearch
 
 from Modified_Delay_Reservoir import mod_Delay_Res
+from Hayes_Param import mod_NARMA_Test
 
 
 def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma=0.05, parameter_searched="theta",
@@ -154,12 +158,12 @@ def ml_test_hayes(param):
 	Declares variables to hyperopt.
 	Returns the mean NRMSE of 3 NARMA10 tasks
 	"""
-	gamma, eta, beta, theta, hayes_param = \
-		param['gamma'], param['eta'], param['beta'], param['theta'], param['hayes_param']
+	gamma, eta, beta, theta, k1 = \
+		param['gamma'], param['eta'], param['beta'], param['theta'], param['k1']
 
 	N = 400  # Number of Nodes
 
-	return np.mean([NARMA_Test(
+	return np.mean([mod_NARMA_Test(
 		test_length=1000,
 		train_length=3200,
 		gamma=gamma,
@@ -169,7 +173,7 @@ def ml_test_hayes(param):
 		bits=np.inf,
 		preload=False,
 		beta=beta,
-		fudge=hayes_param,
+		k1=k1,
 		tau=N,
 		activate='hayes',
 		theta=theta
@@ -184,17 +188,15 @@ def hyperopt_grad_hayes():
 		space={
 			# 'x': hp.randint('x',800),
 			'gamma': hp.uniform('gamma', 0.01, 3),
-			'eta': hp.uniform('eta', 0, 1),
+			'eta': hp.uniform('eta', 0, 10),
 			# 'N': hp.randint('N',800),
 			'theta': hp.uniform('theta', 0, 1),
 			'beta': hp.uniform('beta', 0, 1),
-			'hayes_param': hp.uniform('hayes_param', 0, 1)
+			'k1': hp.uniform('hayes_param', 0, 10)
 		},
 		algo=tpe.suggest,
 		max_evals=100
 	)
-
-	
 
 	print(best)
 
@@ -336,10 +338,12 @@ def ray_hayes():
 
 	algo = HyperOptSearch(
 		space,
-		metric = "mean_loss" #What do I fill out here? Filling it with Mean_loss for now
+		metric = "mean_loss", #What do I fill out here? Filling it with Mean_loss for now \
+		mode = "min",
+		points_to_evaluate=100
 	)
 
-	scheduler = AsyncHyperBandScheduler(metric = "mean_loss" # What should i put? Filling with mean_loss for now
+	scheduler = AsyncHyperBandScheduler(metric = "mean_loss" # What should i put? Filling with mean_loss for now \ 
 													,mode = "min")
 	tune.run(ray_test_hayes, search_alg = algo, scheduler = scheduler)
 
@@ -348,7 +352,7 @@ def ray_hayes():
 ##### TESTS #####
 
 #### Ray tests ####
-ray_hayes()
+# ray_hayes()
 
 #### mg_hayes_comp tests ####
 # mg_hayes_comp()
@@ -358,6 +362,6 @@ ray_hayes()
 
 #### Hyperopt Tests ####
 # hyperopt_grad_wright()
-# hyperopt_grad_hayes()
+hyperopt_grad_hayes()
 # hyperopt_grad_mg()
 
