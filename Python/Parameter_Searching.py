@@ -72,6 +72,9 @@ def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma
 
 
 def mg_hayes_comp():
+	"""
+	Function to compare the x(t)'s for optimal parameters for Mackey-Glass and Hayes
+	"""
 	# Set large parameters for calculate
 	t = 1
 	bits = np.inf
@@ -97,23 +100,23 @@ def mg_hayes_comp():
 	### MG portion, collect output
 	activate = 'mg'
 	np.random.seed(10)			# Reset the seed
-	N = 509			# # o' nodes for optimal MG performance
-	r1 = mod_Delay_Res(N=N, eta=0.94, gamma=0.28, theta=0.834, \
-						beta=0.74, tau=N)
-	m = np.random.choice([0.1,-0.1], [1,N])			# Tailor the mask to the number of nodes
-	m1 = m.reshape(N,)
-	x_mg, vn_mg = r1.calculate(u[:train_length], m1, bits, t, activate, no_act_res=True)  # Takes the actual output
+	mg_N = 509			# # o' nodes for optimal MG performance
+	r1 = mod_Delay_Res(N=mg_N, eta=0.94, gamma=0.28, theta=0.834, \
+						beta=0.74, tau=mg_N)
+	m = np.random.choice([0.1,-0.1], [1,mg_N])			# Tailor the mask to the number of nodes
+	m1 = m.reshape(mg_N,)
+	x_mg, vn_mg = r1.calculate(u, m1, bits, t, activate, no_act_res=True)  # Takes the actual output
 
 
 	### Hayes portion, collect output
 	np.random.seed(10)			# Reset the seed
-	N = 400			# Redefine the # o' Nodes for optimal Hayes
-	r1 = mod_Delay_Res(N=N, eta=0.401, gamma=0.531, theta=0.2, \
-						beta=0.7, tau=N)
+	hayes_N = 400			# Redefine the # o' Nodes for optimal Hayes
+	r1 = mod_Delay_Res(N=hayes_N, eta=0.401, gamma=0.531, theta=0.2, \
+						beta=0.7, tau=hayes_N)
 	activate = 'hayes'
-	m = np.random.choice([0.1,-0.1], [1,N])
-	m = m.reshape(N,)
-	x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)
+	m = np.random.choice([0.1,-0.1], [1,hayes_N])
+	m = m.reshape(hayes_N,)
+	x_hayes, vn_hayes = r1.calculate(u, m, bits, t, activate, no_act_res=True)
 
 	# Flatten the values
 	x_mg = x_mg.flatten()
@@ -122,32 +125,42 @@ def mg_hayes_comp():
 	vn_mg = vn_mg.flatten()
 	vn_hayes = vn_hayes.flatten()
 
+	# Create a copy of pre-loaded narma sequence for both hayes and mg runs
 	u = np.reshape(u,(-1,1))
 	m1 = np.reshape(m1,(1,-1))
-	masked_narma = u@m1
-	masked_narma = masked_narma.flatten()
+	m = np.reshape(m,(1,-1))
+	masked_narma_mg = u@m1
+	masked_narma_mg = masked_narma_mg.flatten()
+	masked_narma_hayes = u@m
+	masked_narma_hayes = masked_narma_hayes.flatten()
+
+	# Create x-axis
+	cycles = len(u)
+	axis_mg = np.linspace(0,cycles,mg_N * len(u))
+	axis_hayes = np.linspace(0,cycles,hayes_N * len(u))
 
 	# Plot the data
 	plt.figure(1)
-	plt.plot(x_mg, label="Mackey-Glass")
-	plt.plot(x_hayes, label="Hayes")
-	plt.xlabel("the nth node calculated")
-	plt.title("Raw Mg vs Hayes Ouput given same NARMA Input")
+	plt.plot(axis_mg,x_mg,label="Mackey-Glass")
+	plt.plot(axis_hayes,x_hayes,label="Hayes")
+	plt.xlabel("nth NARMA Input")
+	plt.title("Mg vs Hayes Ouput given same NARMA Input (ind. optimal param)")
 	plt.legend()
 
 	plt.figure(2)
-	plt.plot(masked_narma, label = "Masked Narma Input")
-	plt.plot(x_mg, label="Mackey-Glass")
-	plt.plot(x_hayes, label="Hayes")
-	plt.xlabel("the nth node calculated")
-	plt.title("Raw Mg vs Hayes Ouput given same NARMA Input")
+	plt.plot(axis_mg, masked_narma_mg,label = "Masked Narma Input")
+	plt.plot(axis_mg,x_mg,label="Mackey-Glass")
+	# plt.plot(x_hayes, label="Hayes")
+	plt.xlabel("nth NARMA Input")
+	plt.title("Mg Ouput given NARMA Input (ind. optimal param)")
 	plt.legend()
 
 	plt.figure(3)
-	plt.plot(vn_mg, label="Mackey-Glass, no activation function")
-	plt.plot(vn_hayes, label="Hayes, no activation function")
-	plt.xlabel("the nth node calculated")
-	plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
+	plt.plot(axis_hayes,masked_narma_hayes,label = "Masked Narma Input")
+	plt.plot(axis_hayes,x_hayes,label="Hayes")
+	# plt.plot(x_hayes, label="Hayes")
+	plt.xlabel("nth NARMA Input")
+	plt.title("Hayes Ouput given NARMA Input (ind. optimal param)")
 	plt.legend()
 
 	plt.show()
@@ -158,8 +171,8 @@ def ml_test_hayes(param):
 	Declares variables to hyperopt.
 	Returns the mean NRMSE of 3 NARMA10 tasks
 	"""
-	gamma, eta, beta, theta, k1 = \
-		param['gamma'], param['eta'], param['beta'], param['theta'], param['k1']
+	gamma, eta, k1 = \
+		param['gamma'], param['eta'], param['k1'], # param['beta'], param['theta'],
 
 	N = 400  # Number of Nodes
 
@@ -172,11 +185,11 @@ def ml_test_hayes(param):
 		eta=eta,
 		bits=np.inf,
 		preload=False,
-		beta=beta,
+		beta=1,
 		k1=k1,
 		tau=N,
 		activate='hayes',
-		theta=theta
+		theta=0.2
 	)[0] for _ in range(3)])
 
 def hyperopt_grad_hayes():
@@ -187,11 +200,11 @@ def hyperopt_grad_hayes():
 		fn=ml_test_hayes,
 		space={
 			# 'x': hp.randint('x',800),
-			'gamma': hp.uniform('gamma', 0.01, 3),
+			'gamma': hp.uniform('gamma', 0.01, 0.5),
 			'eta': hp.uniform('eta', 0, 10),
 			# 'N': hp.randint('N',800),
-			'theta': hp.uniform('theta', 0, 1),
-			'beta': hp.uniform('beta', 0, 1),
+			# 'theta': hp.uniform('theta', 0, 1),
+			# 'beta': hp.uniform('beta', 0, 1),
 			'k1': hp.uniform('hayes_param', 0, 10)
 		},
 		algo=tpe.suggest,
@@ -298,8 +311,8 @@ def ray_test_hayes(param):
 	Passes the mean NRMSE of 3 NARMA10 tasks into Ray for Async optomization
 	
 	"""
-	gamma, eta, beta, theta, hayes_param = \
-		param['gamma'], param['eta'], param['beta'], param['theta'], param['hayes_param']
+	gamma, eta, beta, hayes_param = \
+		param['gamma'], param['eta'], param['beta'],  param['hayes_param'] #, param['theta']
 
 	N = 400  # Number of Nodes
 
@@ -316,12 +329,11 @@ def ray_test_hayes(param):
 		fudge=hayes_param,
 		tau=N,
 		activate='hayes',
-		theta=theta
+		theta=0.2
 	)[0] for _ in range(3)])
 
 	ray.report(mean_loss = intermediate_score)
 	time.sleep(0.1)			# As seen in example doc
-
 
 def ray_hayes():
 	ray.init(configure_logging = False)
@@ -331,7 +343,7 @@ def ray_hayes():
 		'gamma': hp.uniform('gamma', 0.01, 3),
 		'eta': hp.uniform('eta', 0, 1),
 		# 'N': hp.randint('N',800),
-		'theta': hp.uniform('theta', 0, 1),
+		# 'theta': hp.uniform('theta', 0, 1),
 		'beta': hp.uniform('beta', 0, 1),
 		'hayes_param': hp.uniform('hayes_param', 0, 1)
 	},
@@ -355,13 +367,13 @@ def ray_hayes():
 # ray_hayes()
 
 #### mg_hayes_comp tests ####
-# mg_hayes_comp()
+mg_hayes_comp()
 
 #### Grid search tests ####
 # wright_grid_search(parameter_searched="eta_gamma", activation = "hayes")
 
 #### Hyperopt Tests ####
 # hyperopt_grad_wright()
-hyperopt_grad_hayes()
+# hyperopt_grad_hayes()
 # hyperopt_grad_mg()
 

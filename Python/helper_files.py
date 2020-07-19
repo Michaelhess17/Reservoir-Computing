@@ -95,6 +95,7 @@ def cross_validate(alphas,x,x_test,target):
         
         #Compare with previous best and update if better
         if(NRMSE < best_nrmse):
+            optimal_alpha = a
             best_nrmse = NRMSE
             best_prediction = y_test
             best_train = y_input
@@ -186,7 +187,7 @@ def plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N):
         plt.plot(target[train_length + 50:], label='Target')
         plt.title('NRMSE = %f' % NRMSE)
 
-        plt.xlabel('N =400, eta = 0.75, gamma = 0.05, tau = 400, beta =1,theta = 0.2, k1 = 1, act = mg')         # Must be Changed Manually....
+        # plt.xlabel('N =400, eta = 0.75, gamma = 0.05, tau = 400, beta =1,theta = 0.2, k1 = 1, act = mg')         # Must be Changed Manually....
         
         plt.legend()
 

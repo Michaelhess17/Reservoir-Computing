@@ -130,8 +130,6 @@ class DelayReservoir():
 			Mx_new_nAct = Mx_no_act.reshape(1+cycles,self.N)
 
 			return M_x_new[1:,0:self.N*t:t], Mx_new_nAct[1:,0:self.N*t:t]  
-
-
 		#Remove first row of zeroes, select values at node spacing
 		return M_x_new[1:,0:self.N*t:t]
 
