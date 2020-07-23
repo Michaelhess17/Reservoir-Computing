@@ -70,7 +70,6 @@ def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma
 		ax.set(xlabel="gamma", ylabel="k", title="Wright simulation results for NARMA task")
 		plt.show()
 
-
 def mg_hayes_comp():
 	"""
 	Function to compare the x(t)'s for optimal parameters for Mackey-Glass and Hayes

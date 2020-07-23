@@ -19,10 +19,10 @@ function [sox,soy] = dde23Hayes(tau, input)
     gamma = 0.05;
     Jt = input(1);
     
-    % Using Hayes equation
-    dx = @(t,x,XL) k1.*x - k2.*( XL + gamma .* Jt);
+    % Using Mackey Glass equation
+    dx = @(t,x,XL) k1.*x - k2.*( (XL + gamma .* Jt ) ./ (1 + gamma .* Jt) );
     
-    cycles = size(input,2);          % Grab the # of columns - how many iterations of tau we are doing
+    cycles = size(input,1);          % Grab the # of columns - how many iterations of tau we are doing
     duration = tau * cycles;            % set the duration to however many cycles of tau
 %     t = linspace(0,duration,cycles);      % Cut up a range from 0 to duration by the number of cycles
     
@@ -41,21 +41,15 @@ function [sox,soy] = dde23Hayes(tau, input)
         time_block = t_domain(i);            % Set the time block
         t = linspace(sol.x(end), time_block,cuts);           % Create a slice over which to solve dde23
         
-        hist = sol.y(end:-1:cuts);          % Initial Condition set as the last value computed by the last iteration
+        hist = sol.y(end);          % Initial Condition set as the last value computed by the last iteration
         Jt = input(i);           % Redefine input 
-        
+
         % Iteratively solve each theta block
         it_sol = dde23(dx, tau, hist, t);
         
-        % Grab the first y values of each branch and flip them so they're
-        % horizontal
-        
-        one_column = it_sol.y(:,2);
-        it_sol.y = one_column.';
-        
         % Combine history solution and current solution 
-        sol.x = [sol.x, it_sol.x];
-        sol.y = [sol.y, it_sol.y];
+        sol.x = [sol.x it_sol.x];
+        sol.y = [sol.y it_sol.y];
         it_sol = [];
     end
     

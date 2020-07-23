@@ -11,7 +11,7 @@ from helper_files import cross_validate, make_training_testing_set, load_NARMA, 
 from sklearn.linear_model import Ridge
 from sklearn.linear_model import RidgeClassifier
 
-from Modified_Delay_Reservoir import mod_Delay_Res
+from Modified_Delay_Reservoir import mod_Delay_Res, hayes_special_Delay_Res
 
 """
 Intended to store parameter tweaks for Hayes 07/10/20 until able to merge this code with that in Parameter_Searching.py when Ray/Tune works
@@ -90,7 +90,7 @@ def mod_NARMA_Test(test_length=800, train_length=800,
 def Identical_NARMA_Comp(test_length=800, train_length=800,
 			   plot=True, N=400, eta=0.4, gamma=0.05, tau=400, 
 			   bits=np.inf, preload=False, write=False, mask=0.1, activate='mg',
-			   cv=False, beta=1.0, t=1, k1 = 1.15, theta=0.2, no_act_res = False):
+			   cv=True, beta=1.0, t=1, k1 = 1.15, theta=0.2, no_act_res = False):
 	"""
 	Args:
 		test_length: length of testing data
@@ -111,6 +111,13 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 	Returns:
 		NRMSE: Normalized Root Mean Square Error
 	"""
+	### Redefine redefine Parameters ###
+	gamma = 0.5
+	eta = 0.941
+	beta = 0.83435
+	N = 509
+	tau = 509
+	theta = 0.20034
 
 	# Import u, m, and target
 	u, m, target = load_NARMA(preload, train_length, test_length, mask, N)
@@ -127,7 +134,10 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 			return NRSME, x_test_bot			# Should the parameters be those that put Hayes in unstable territory, 
 				
 		# Instantiate Reservoir, feed in training and predictiondatasets
-		r1 = mod_Delay_Res(N=N, k1 = k1, eta=eta, gamma=gamma, theta=theta,beta=beta, tau=tau)
+		if activate == "mg":
+			r1 = mod_Delay_Res(N=N, k1 = k1, eta=eta, gamma=gamma, theta=theta,beta=beta, tau=tau)
+		if activate == "hayes":
+			r1 = hayes_special_Delay_Res(N=N, k1 = k1, eta=eta, gamma=gamma, theta=theta,beta=beta, tau=tau)
 		x = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res = no_act_res)
 		# Is this correct? It looks like x_test and x_test_bot are defined as the same thing
 		x_test = r1.calculate(u[train_length:], m, bits, t, activate, no_act_res = no_act_res)                # Don't reference [0] unless no_act_res == True
@@ -176,6 +186,7 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 		# Add the differences to hayes original output
 		x = hayes_x + x_diff
 		x_test = hayes_test + x_test_diff
+
 		# Calculate and train
 		# Train using Ridge Regression with hyperparameter tuning
 		if cv:
@@ -193,7 +204,6 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 		altered_hayes_NRMSE = NRMSE
 		altered_hayes_sol = y_test.flatten()
 
-
 	# Plot predicted Time Series
 	if plot:
 		if 'hayes' in activate_ls:
@@ -201,7 +211,7 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 			plt.plot(target.flatten()[train_length:], label = "NRMSE Input Sequence")
 			plt.plot(mg_sol_0,label="mackey Glass")
 			plt.plot(hayes_sol, label = "hayes")
-			plt.title("Post-Ridge Regression mg vs. hayes: NRMSE_h = "+ str(hayes_NRMSE) + ", NRMSE_mg = " + str(mg_0_NRMSE))
+			plt.title("Post-Ridge Regression mg vs. hayes: NRMSE_h = "+ str(round(hayes_NRMSE,3)) + ", NRMSE_mg = " + str(round(mg_0_NRMSE,3)))
 			plt.legend()
 
 			plt.figure(2)
@@ -214,6 +224,11 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 			plt.plot(altered_hayes_sol, label = 'altered hayes')
 			plt.plot(mg_sol_0, label = 'mackey glass')
 			plt.title("corrected hayes vs mackey glass: NRMSE_altH = " + str(altered_hayes_NRMSE) + ", NRMSE_mg = " + str(mg_0_NRMSE))
+			plt.legend()
+
+			plt.figure(4)
+			plt.plot(np.append(x_diff.flatten(),x_test_diff.flatten()), label = 'mg - hayes')
+			plt.title("difference between mg and hayes before ridge")
 			plt.legend()
 
 			plt.show()
@@ -368,7 +383,7 @@ def optimal_NARMA_Comp(test_length=800, train_length=800,
 # 			eta=0.75, 
 # 			gamma=0.05,
 # 			tau=400, 
-# 			k1= 1,			
+# 			k1= 1,
 
 # 			bits=np.inf, 
 # 			preload=True, 
