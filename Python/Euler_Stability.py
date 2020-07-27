@@ -14,6 +14,10 @@ are drastically different from those in matlab. Comparing the matlab results
 to the ones in python will gives us a ballpark of whether or not the thing is working.
 """
 
+"""
+SCRATCH THAT IM JUST GOING TO SEE IF I CAN BOOST HAYES
+"""
+
 def single_node_calculate():
 
     activation = ["hayes","mg"]
@@ -51,7 +55,20 @@ def single_node_calculate():
 
         # Store results of calculate
         calc_results[activate] = delay_res.calculate(u, m, np.inf, t = 1, act = activate)
-    
+		x = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res = no_act_res)
+        x_test = r1.calculate(u[train_length:], m, bits, t, activate, no_act_res = no_act_res)
+
+        if cv:
+			NRMSE, y_test, y_input = cross_validate(alphas=np.logspace(-20, 5, 16), x=x, x_test=x_test, target=target)
+		else:
+			clf = Ridge(alpha=0)
+			clf.fit(x, target[:train_length])
+			y_test = clf.predict(x_test)
+
+			# Calculate NRMSE of prediction data
+			NRMSE = np.sqrt(
+				np.mean(np.square(y_test[50:] - target[train_length + 50:])) / np.var(target[train_length + 50:]))
+
     # display the results
     calc_hayes = calc_results["hayes"]
     calc_mg = calc_results["mg"]

@@ -396,30 +396,30 @@ def optimal_NARMA_Comp(test_length=800, train_length=800,
 # 			theta=0.2,
 # 			no_act_res = False)
 
-# NRMSE2, bot2, u2 = mod_NARMA_Test(
-# 			test_length=800, 
-# 			train_length=800,
-# 			plot=True, 
-# 			N=400, 
-# 			eta=1, 
-# 			gamma= 0.05,
-# 			tau=400, 
-# 			k1= 1.15,			# 8.5468
+NRMSE2, bot2, u2 = mod_NARMA_Test(
+			test_length=800, 
+			train_length=800,
+			plot=True, 
+			N=400, 
+			eta=1, 
+			gamma= 0.05,
+			tau=400, 
+			k1= 1.15,			# 8.5468
 
-# 			bits=np.inf, 
-# 			preload=True, 
-# 			write=False, 
-# 			mask=0.1, 
-# 			activate='hayes',
-# 			cv=True, 
-# 			beta=1, 
-# 			t=1, 
-# 			theta=0.2,			#0.930
-# 			no_act_res = False)
+			bits=np.inf, 
+			preload=True, 
+			write=False, 
+			mask=0.1, 
+			activate='hayes',
+			cv=True, 
+			beta=1, 
+			t=1, 
+			theta=0.2,			#0.930
+			no_act_res = False)
 
 
 ### Compare hayes and Mg different performance
-Identical_NARMA_Comp()
+# Identical_NARMA_Comp()
 
 # print('hello')
 #eta = 1 and k1 = 1.15, gamma = 9.95, N =400, beta = 1, theta = 0.2, NRMSE ~ 0.35 - 0.40

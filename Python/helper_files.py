@@ -4,7 +4,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, ElasticNet
 from sklearn.model_selection import train_test_split
 
 # from hyperopt import hp, tpe, fmin
@@ -85,7 +85,8 @@ def cross_validate(alphas,x,x_test,target):
     best_train = np.array([])
     np.append(alphas,0)
     for a in alphas:
-        clf = Ridge(alpha = a)
+        # clf = Ridge(alpha = a)
+        clf = ElasticNet(alpha = a, max_iter = 100000)           # Default max_iter = 1000
         clf.fit(x,target[:len(x)])
         y_test = clf.predict(x_test)
         y_input = clf.predict(x)
