@@ -4,7 +4,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import Ridge, ElasticNet
 from sklearn.model_selection import train_test_split
 
 # from hyperopt import hp, tpe, fmin
@@ -85,7 +85,8 @@ def cross_validate(alphas,x,x_test,target):
     best_train = np.array([])
     np.append(alphas,0)
     for a in alphas:
-        clf = Ridge(alpha = a)
+        # clf = Ridge(alpha = a)
+        clf = ElasticNet(alpha = a, max_iter = 100000)           # Default max_iter = 1000
         clf.fit(x,target[:len(x)])
         y_test = clf.predict(x_test)
         y_input = clf.predict(x)
@@ -95,6 +96,7 @@ def cross_validate(alphas,x,x_test,target):
         
         #Compare with previous best and update if better
         if(NRMSE < best_nrmse):
+            optimal_alpha = a
             best_nrmse = NRMSE
             best_prediction = y_test
             best_train = y_input
@@ -157,6 +159,12 @@ def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
         u = np.array(u)
         m = np.array(m)
         m = m[:N]  # Able to do preloaded data for all sorts of node sizes
+
+        if N > 400:         # If you want more than 400 nodes:
+            np.random.seed(10)          # Resets the seed so behaves the same
+            m = np.random.choice([0.1,-0.1], [1,N])         # Tailor the mask to the number of nodes
+            m = m.reshape(N,)
+
     # Randomly initialize u and m
     else:
         u = np.random.rand(train_length + test_length) / 2.
@@ -169,35 +177,35 @@ def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
 
 
 def plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N):
-    plt.figure(1)
-    plt.plot(np.linspace(0, 1e-3 * train_length, N * train_length), x.flatten()[0:])
-    plt.xlabel('time [ms]')
-    plt.ylabel('x(t) [V]')
-    plt.figure(2)
-    plt.plot(y_test[50:], label='Prediction')
-    plt.plot(target[train_length + 50:], label='Target')
-    plt.title('NRMSE = %f' % NRMSE)
-    plt.legend()
+    if x_test_bot == 0:
+        plt.figure(1)
+        plt.plot(np.linspace(0, 1e-3 * train_length, N * train_length), x.flatten()[0:])
+        plt.xlabel('time [ms]')
+        plt.ylabel('x(t) [V]')
 
-    plt.figure(2)
-    plt.plot(y_test[50:], label='Prediction')
-    plt.plot(target[train_length + 50:], label='Target')
-    plt.title('NRMSE = %f' % NRMSE)
-    plt.legend()
+        plt.figure(2)
+        plt.plot(y_test[50:], label='Prediction')
+        plt.plot(target[train_length + 50:], label='Target')
+        plt.title('NRMSE = %f' % NRMSE)
 
-    plt.figure(3)
-    plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
-             label="[beta * x(t) + gamma * j(t)] ^ 1")
-    plt.plot(np.linspace(0, N * u.shape[0], u.shape[0]), u.flatten()[0:], label="Input Narma Taks")
-    plt.xlabel("cycle * nodes")
-    plt.title("MG Denominator compared to NARMA Input")
-    plt.legend()
+        # plt.xlabel('N =400, eta = 0.75, gamma = 0.05, tau = 400, beta =1,theta = 0.2, k1 = 1, act = mg')         # Must be Changed Manually....
+        
+        plt.legend()
 
-    plt.figure(4)
-    plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
-             label="[beta * x(t) + gamma * j(t)] ^ 1")
-    plt.xlabel("cycle * Nodes")
-    plt.title("MG Denominator : [beta * x(t) + gamma * j(t)] ^ 1")
+    else:
+        plt.figure(3)
+        plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
+                label="[beta * x(t) + gamma * j(t)] ^ 1")
+        plt.plot(np.linspace(0, N * u.shape[0], u.shape[0]), u.flatten()[0:], label="Input Narma Taks")
+        plt.xlabel("cycle * nodes")
+        plt.title("MG Denominator compared to NARMA Input")
+        plt.legend()
+
+        plt.figure(4)
+        plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
+                label="[beta * x(t) + gamma * j(t)] ^ 1")
+        plt.xlabel("cycle * Nodes")
+        plt.title("MG Denominator : [beta * x(t) + gamma * j(t)] ^ 1")
 
     plt.show()
 
