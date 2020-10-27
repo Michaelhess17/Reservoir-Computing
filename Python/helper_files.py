@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import Ridge, ElasticNet
 from sklearn.model_selection import train_test_split
 
 # from hyperopt import hp, tpe, fmin
@@ -105,7 +106,6 @@ def cross_validate(alphas, x, x_test, target):
 
 	return best_nrmse, best_prediction, best_train, clf
 
-
 def make_training_testing_set(num_waves=1000, test_percent=0.1, preload=False, write=False):
 	if not preload:
 		num_sin, num_saw, num_square = [num_waves // 3] * 3
@@ -184,7 +184,6 @@ def plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N):
 		plt.plot(np.linspace(0, 1e-3 * train_length, N * train_length), x.flatten()[0:])
 		plt.xlabel('time [ms]')
 		plt.ylabel('x(t) [V]')
-
 		plt.figure(2)
 		plt.plot(y_test[50:], label='Prediction')
 		plt.plot(target[train_length + 50:], label='Target')

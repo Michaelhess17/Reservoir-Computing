@@ -1,3 +1,4 @@
+
 import numpy as np
 
 from Delay_Reservoir import DelayReservoir

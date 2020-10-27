@@ -7,6 +7,7 @@ from Delay_Reservoir import DelayReservoir
 from RC_test import run_test, NARMA_Test
 
 
+
 def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma=0.05, parameter_searched="theta",
 					   activation="hayes"):
 	"""
@@ -61,8 +62,10 @@ def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma
 		ax.set(xlabel="gamma", ylabel="k", title="Wright simulation results for NARMA task")
 		plt.show()
 
-
 def mg_hayes_comp():
+	"""
+	Function to compare the x(t)'s for optimal parameters for Mackey-Glass and Hayes
+	"""
 	# Set large parameters for calculate
 	t = 1
 	bits = np.inf
@@ -87,14 +90,17 @@ def mg_hayes_comp():
 
 	### MG portion, collect output
 	activate = 'mg'
+
 	r1 = DelayReservoir(N=400, eta=1, gamma=0.05, theta=0.2, beta=1, tau=400)
 	x_mg, vn_mg = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)  # Takes the actual output
 	# x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
 	# Hayes portion, collect output
+
 	activate = 'hayes'
-	x_hayes, vn_hayes = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)
-	# x_hayes_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
+	m = np.random.choice([0.1,-0.1], [1,hayes_N])
+	m = m.reshape(hayes_N,)
+	x_hayes, vn_hayes = r1.calculate(u, m, bits, t, activate, no_act_res=True)
 
 	# Flatten the values
 	x_mg = x_mg.flatten()
@@ -103,21 +109,43 @@ def mg_hayes_comp():
 	vn_mg = vn_mg.flatten()
 	vn_hayes = vn_hayes.flatten()
 
+	# Create a copy of pre-loaded narma sequence for both hayes and mg runs
+	u = np.reshape(u,(-1,1))
+	m1 = np.reshape(m1,(1,-1))
+	m = np.reshape(m,(1,-1))
+	masked_narma_mg = u@m1
+	masked_narma_mg = masked_narma_mg.flatten()
+	masked_narma_hayes = u@m
+	masked_narma_hayes = masked_narma_hayes.flatten()
+
+	# Create x-axis
+	cycles = len(u)
+	axis_mg = np.linspace(0,cycles,mg_N * len(u))
+	axis_hayes = np.linspace(0,cycles,hayes_N * len(u))
+
 	# Plot the data
 	plt.figure(1)
-	plt.plot(x_mg, label="mackey-glass")
-	plt.plot(x_hayes, label="hayes")
-	plt.xlabel("cycle * Nodes")
-	plt.title("Raw Mg vs Hayes Ouputs with Same NARMA Input")
+	plt.plot(axis_mg,x_mg,label="Mackey-Glass")
+	plt.plot(axis_hayes,x_hayes,label="Hayes")
+	plt.xlabel("nth NARMA Input")
+	plt.title("Mg vs Hayes Ouput given same NARMA Input (ind. optimal param)")
 	plt.legend()
 
 	plt.figure(2)
-	plt.plot(vn_mg, label="mackey-glass vn")
-	plt.plot(vn_hayes, label="hayes vn")
-	plt.xlabel("cycle * Nodes")
-	plt.title("Raw VN: Mg vs Hayes Ouputs with Same NARMA Input")
+	plt.plot(axis_mg, masked_narma_mg,label = "Masked Narma Input")
+	plt.plot(axis_mg,x_mg,label="Mackey-Glass")
+	# plt.plot(x_hayes, label="Hayes")
+	plt.xlabel("nth NARMA Input")
+	plt.title("Mg Ouput given NARMA Input (ind. optimal param)")
 	plt.legend()
 
+	plt.figure(3)
+	plt.plot(axis_hayes,masked_narma_hayes,label = "Masked Narma Input")
+	plt.plot(axis_hayes,x_hayes,label="Hayes")
+	# plt.plot(x_hayes, label="Hayes")
+	plt.xlabel("nth NARMA Input")
+	plt.title("Hayes Ouput given NARMA Input (ind. optimal param)")
+	plt.legend()
 	plt.show()
 
 def ml_test_hayes(param):
@@ -129,9 +157,10 @@ def ml_test_hayes(param):
 	gamma, eta, beta, hayes_param = \
 		param['gamma'], param['eta'], param['beta'], param['hayes_p']
 
+
 	N = 400  # Number of Nodes
 
-	return np.mean([NARMA_Test(
+	return np.mean([mod_NARMA_Test(
 		test_length=1000,
 		train_length=3200,
 		gamma=gamma,
@@ -140,8 +169,8 @@ def ml_test_hayes(param):
 		eta=eta,
 		bits=np.inf,
 		preload=False,
-		beta=beta,
-		fudge=hayes_param,
+		beta=1,
+		k1=k1,
 		tau=N,
 		activate='hayes',
 		theta=0.2
@@ -159,13 +188,13 @@ def hyperopt_grad_hayes():
 			'eta': hp.uniform('eta', 0.01, 0.99),
 			'beta': hp.uniform('beta', 0, 1),
 			'hayes_p': hp.uniform('hayes_p', 0, 1)
+
 		},
 		algo=tpe.suggest,
 		max_evals=100
 	)
 
 	print(best)
-
 
 def ml_test_wright(param):
 	"""
@@ -191,8 +220,8 @@ def ml_test_wright(param):
 		theta=theta
 	) for _ in range(3)])
 
-
 def hyperopt_grad_wright():
+
 	"""
 	calls the fmin
 	"""
@@ -256,7 +285,112 @@ def hyperopt_grad_mg():
 
 	print(best)
 
+def ml_test_mg(param):
+	"""
+	Sets up 'function' to minimize.
+	Declares variables to hyperopt.
+	Returns the mean NRMSE of 3 NARMA10 tasks
+	"""
+	gamma, eta, N, theta, beta = \
+		param['gamma'], param['eta'], param['N'], \
+		param['theta'], param['beta']
+
+	return np.mean([NARMA_Test(
+		test_length=800,
+		train_length=3200,
+		gamma=gamma,
+		plot=False,
+		N=N,
+		eta=eta,
+		bits=np.inf,
+		preload=False,
+		beta=beta,
+		tau=N,
+		activate='mg',
+		theta=theta
+	) for _ in range(3)])
+
+def hyperopt_grad_mg():
+	"""
+	calls the fmin
+	"""
+	best = fmin(
+		fn=ml_test_mg,
+		space={
+			# 'x': hp.randint('x',800),
+			'gamma': hp.uniform('gamma', 0.01, 2),
+			'eta': hp.uniform('eta', 0, 1),
+			'N': hp.randint('N', 800),
+			'theta': hp.uniform('theta', 0.0001, 1),
+			'beta': hp.uniform('beta', 0, 1)
+		},
+		algo=tpe.suggest,
+		max_evals=100
+	)
+
+	print(best)
+
+def ray_test_hayes(param):
+	"""
+	Sets up 'function' to minimize.
+	Declares variables to hyperopt.
+	Passes the mean NRMSE of 3 NARMA10 tasks into Ray for Async optomization
+	
+	"""
+	gamma, eta, beta, hayes_param = \
+		param['gamma'], param['eta'], param['beta'],  param['hayes_param'] #, param['theta']
+
+	N = 400  # Number of Nodes
+
+	mean_NRMSE = np.mean([NARMA_Test(
+		test_length=1000,
+		train_length=3200,
+		gamma=gamma,
+		plot=False,
+		N=N,
+		eta=eta,
+		bits=np.inf,
+		preload=False,
+		beta=beta,
+		fudge=hayes_param,
+		tau=N,
+		activate='hayes',
+		theta=0.2
+	)[0] for _ in range(3)])
+
+	ray.report(mean_loss = intermediate_score)
+	time.sleep(0.1)			# As seen in example doc
+
+def ray_hayes():
+	ray.init(configure_logging = False)
+
+	space={
+		# 'x': hp.randint('x',800),
+		'gamma': hp.uniform('gamma', 0.01, 3),
+		'eta': hp.uniform('eta', 0, 1),
+		# 'N': hp.randint('N',800),
+		# 'theta': hp.uniform('theta', 0, 1),
+		'beta': hp.uniform('beta', 0, 1),
+		'hayes_param': hp.uniform('hayes_param', 0, 1)
+	},
+
+	algo = HyperOptSearch(
+		space,
+		metric = "mean_loss", #What do I fill out here? Filling it with Mean_loss for now \
+		mode = "min",
+		points_to_evaluate=100
+	)
+
+	scheduler = AsyncHyperBandScheduler(metric = "mean_loss" # What should i put? Filling with mean_loss for now \ 
+													,mode = "min")
+	tune.run(ray_test_hayes, search_alg = algo, scheduler = scheduler)
+
+
+
 ##### TESTS #####
+
+#### Ray tests ####
+# ray_hayes()
 
 #### mg_hayes_comp tests ####
 # mg_hayes_comp()
@@ -266,4 +400,6 @@ def hyperopt_grad_mg():
 
 #### Hyperopt Tests ####
 # hyperopt_grad_wright()
-hyperopt_grad_hayes()
+
+# hyperopt_grad_hayes()
+# hyperopt_grad_mg()

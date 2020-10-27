@@ -7,6 +7,7 @@ from Modified_Delay_Reservoir import mod_Delay_Res, hayes_special_Delay_Res
 from helper_files import cross_validate, load_NARMA, \
 	plot_func, write_func
 
+
 """
 Intended to store parameter tweaks for Hayes 07/10/20 until able to merge this code with that in Parameter_Searching.py when Ray/Tune works
 the tweak in particular is adding a k1 term in front of x(t). We do this by adding in a class variable before a super().__init__() call in 'modified_delay_reservoir'
@@ -21,7 +22,7 @@ def mod_NARMA_Test(test_length=800, train_length=800,
 	Args:
 		test_length: length of testing data
 		train_length: length of training data
-		N: number of virtual high_nodes
+		N: number of virtual nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -32,7 +33,7 @@ def mod_NARMA_Test(test_length=800, train_length=800,
 		cv: perform leave-one-out cross validation
 		beta: driver gain
 		t: timestep used to solve diffeq,
-		theta: distance between virtual high_nodes in time
+		theta: distance between virtual nodes in time
 
 	Returns:
 		NRMSE: Normalized Root Mean Square Error
@@ -89,7 +90,7 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 	Args:
 		test_length: length of testing data
 		train_length: length of training data
-		N: number of virtual high_nodes
+		N: number of virtual nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -100,7 +101,7 @@ def Identical_NARMA_Comp(test_length=800, train_length=800,
 		cv: perform leave-one-out cross validation
 		beta: driver gain
 		t: timestep used to solve diffeq,
-		theta: distance between virtual high_nodes in time
+		theta: distance between virtual nodes in time
 
 	Returns:
 		NRMSE: Normalized Root Mean Square Error
@@ -250,7 +251,7 @@ def optimal_NARMA_Comp(test_length=800, train_length=800,
 	Args:
 		test_length: length of testing data
 		train_length: length of training data
-		N: number of virtual high_nodes
+		N: number of virtual nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -261,7 +262,7 @@ def optimal_NARMA_Comp(test_length=800, train_length=800,
 		cv: perform leave-one-out cross validation
 		beta: driver gain
 		t: timestep used to solve diffeq,
-		theta: distance between virtual high_nodes in time
+		theta: distance between virtual nodes in time
 
 	Returns:
 		NRMSE: Normalized Root Mean Square Error

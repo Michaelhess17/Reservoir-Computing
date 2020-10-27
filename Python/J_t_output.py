@@ -1,6 +1,5 @@
 import numpy as np
 from matplotlib import pyplot as plt
-
 from helper_files import load_NARMA
 
 u, m, target = load_NARMA(True, N = 1)

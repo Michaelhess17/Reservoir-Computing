@@ -21,11 +21,11 @@ from helper_files import cross_validate, make_training_testing_set, load_NARMA, 
 
 ############################################################################
 
-
 def NARMA_Test(test_length=500, train_length=500,
 			   plot=False, N=400, eta=0.4, gamma=0.05, tau=400, fudge=1.0,
 			   preload=False, write=False, mask=0.1, activate='mg',
 			   cv=True, beta=1.0, t=1, theta=0.2, power=1.0):
+
 	"""
 	Args:
 		test_length: length of testing data
@@ -46,7 +46,11 @@ def NARMA_Test(test_length=500, train_length=500,
 	Returns:
 		NRMSE: Normalized Root Mean Square Error
 	"""
-
+	if activate == "Hayes" and self.x_t_term / self.eta:
+		NRSME = 1
+		x_test_bot = 0
+		return NRSME, x_test_bot			# Should the parameters be those that put Hayes in unstable territory, 
+			
 	# Import u, m, and target
 	u, m, target = load_NARMA(preload, train_length, test_length, mask, N)
 
@@ -58,6 +62,7 @@ def NARMA_Test(test_length=500, train_length=500,
 	x_test = r1.calculate(u[train_length:], m, t, activate)
 
 	x_test_bot = r1.calculate(u[train_length:], m, t, activate)
+
 
 	# Train using Ridge Regression with hyperparameter tuning
 	if cv:
@@ -74,10 +79,14 @@ def NARMA_Test(test_length=500, train_length=500,
 	# Write to File
 	if write:
 		write_func(x, x_test)
+	
+	if not no_act_res:
+		x_test_bot = 0			# If I don't want to find the x(t)-x(t-tau) term, set flag before plotting
 
 	# Plot predicted Time Series
 	if plot:
 		plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N)
+
 
 	return NRMSE, x_test_bot
 
@@ -251,4 +260,47 @@ NARMA_Test(
 	cv=False
 	)
 
+
+
+=======
+#### run_test tests ####
+# run_test(eta = 0.5, max_Tau = 9.993, gamma = 0.7, theta = 0.2, activation = "wright")
+# run_test(eta = 0.05, max_Tau = 150, gamma = 0.5, theta = 0.2, activation = "hayes")
+
+
+#### General Test for NARMA_Test ####
+# NARMA_Test(
+#     test_length = 800,
+#     train_length = 3200,
+#     gamma = 0.48707341674880045,
+#     plot = True,
+#     N = 317,
+#     eta = 0.9615229252495553,
+#     bits = np.inf,
+#     preload = False,
+#     cv = True,
+#     beta = 0.408835328209339, 
+#     tau = 317,
+#     activate = 'hayes',
+#     theta = 0.2
+#     )
+
+# NARMA_Test(
+# 	test_length = 800,
+# 	train_length = 800,
+# 	gamma = 0.20,
+# 	plot = True,
+# 	N = 400,
+# 	eta = 1,
+# 	bits = np.inf,
+# 	preload = False,
+# 	cv = True,
+# 	beta = 1, 
+# 	tau = 400,
+# 	activate = 'hayes',
+# 	theta = 0.2,
+# 	no_act_res = False
+# 	)
+
+# print(run_test(eta=0.35, max_Tau=400, gamma=0.05, activation='mg', type="C"))
 

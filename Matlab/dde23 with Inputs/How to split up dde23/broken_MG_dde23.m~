@@ -1,0 +1,30 @@
+function [sox,soy] = broken_MG_dde23(tau)
+    % Solves Mackey-Glass with DDE23 in pieces
+    %
+    % Goal: Be able to inject new j(t) into integration
+
+    % Declare Parameters
+    eta = 2;
+    gamma = 1; 
+    n = 9.65;
+    
+    % Define Mackey-Glass equation and duration for entire integration
+    dx = @(t,x,XL)  eta .* ( XL ./ ( 1 + XL .^ n) ) - (gamma .* x);
+    duration = 1000;
+    
+    % Run first dde solve on the first block of tau
+    sol = dde23(dx, tau, [0], [0,tau]);
+    
+    while sol.x(end) < duration
+
+        
+        it_sol = dde23(dx, tau, hist, t, 'InitialY');           % This should solve MG for some interval
+%         hist = interp1(it_sol.x, it_sol.y,[theta]);
+        hist = it_sol.y;          % Because we are "continuing the integration" but only changing the j(t)
+        
+    end
+
+    sox = it_sol.x;
+    soy = it_sol.y;
+    
+end
