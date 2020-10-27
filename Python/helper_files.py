@@ -179,37 +179,37 @@ def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
 
 
 def plot_func(x, x_test_bot, u, y_test, target, NRMSE, train_length, N):
-	plt.figure(1)
-	plt.plot(np.linspace(0, 1e-3 * train_length, N * train_length), x.flatten()[0:])
-	plt.xlabel('time [ms]')
-	plt.ylabel('x(t) [V]')
-	plt.figure(2)
-	plt.plot(y_test[50:], label='Prediction')
-	plt.plot(target[train_length + 50:], label='Target')
-	plt.title('NRMSE = %f' % NRMSE)
-	plt.legend()
+	if x_test_bot == 0:
+		plt.figure(1)
+		plt.plot(np.linspace(0, 1e-3 * train_length, N * train_length), x.flatten()[0:])
+		plt.xlabel('time [ms]')
+		plt.ylabel('x(t) [V]')
 
-	plt.figure(2)
-	plt.plot(y_test[50:], label='Prediction')
-	plt.plot(target[train_length + 50:], label='Target')
-	plt.title('NRMSE = %f' % NRMSE)
-	plt.legend()
+		plt.figure(2)
+		plt.plot(y_test[50:], label='Prediction')
+		plt.plot(target[train_length + 50:], label='Target')
+		plt.title('NRMSE = %f' % NRMSE)
 
-	# plt.figure(3)
-	# plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
-	#          label="[beta * x(t) + gamma * j(t)] ^ 1")
-	# plt.plot(np.linspace(0, N * u.shape[0], u.shape[0]), u.flatten()[0:], label="Input Narma Taks")
-	# plt.xlabel("cycle * nodes")
-	# plt.title("MG Denominator compared to NARMA Input")
-	# plt.legend()
-	#
-	# plt.figure(4)
-	# plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
-	#          label="[beta * x(t) + gamma * j(t)] ^ 1")
-	# plt.xlabel("cycle * Nodes")
-	# plt.title("MG Denominator : [beta * x(t) + gamma * j(t)] ^ 1")
+		# plt.xlabel('N =400, eta = 0.75, gamma = 0.05, tau = 400, beta =1,theta = 0.2, k1 = 1, act = mg')         # Must be Changed Manually....
 
-	plt.show()
+		plt.legend()
+
+	else:
+		plt.figure(3)
+		plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
+		         label="[beta * x(t) + gamma * j(t)] ^ 1")
+		plt.plot(np.linspace(0, N * u.shape[0], u.shape[0]), u.flatten()[0:], label="Input Narma Taks")
+		plt.xlabel("cycle * high_nodes")
+		plt.title("MG Denominator compared to NARMA Input")
+		plt.legend()
+
+		plt.figure(4)
+		plt.plot(np.linspace(0, x_test_bot.flatten().shape[0], x_test_bot.flatten().shape[0]), x_test_bot.flatten()[0:],
+		         label="[beta * x(t) + gamma * j(t)] ^ 1")
+		plt.xlabel("cycle * Nodes")
+		plt.title("MG Denominator : [beta * x(t) + gamma * j(t)] ^ 1")
+
+		plt.show()
 
 
 def write_func(x, x_test):

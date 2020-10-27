@@ -30,7 +30,7 @@ def NARMA_Test(test_length=500, train_length=500,
 	Args:
 		test_length: length of testing data
 		train_length: length of training data
-		N: number of virtual nodes
+		N: number of virtual high_nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -41,7 +41,7 @@ def NARMA_Test(test_length=500, train_length=500,
 		cv: perform leave-one-out cross validation
 		beta: driver gain
 		t: timestep used to solve diffeq,
-		theta: distance between virtual nodes in time
+		theta: distance between virtual high_nodes in time
 
 	Returns:
 		NRMSE: Normalized Root Mean Square Error
@@ -86,7 +86,7 @@ def Classification_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_w
 						preload=False, write=False, mask=0.1, activate='mg', beta=1.0, power=7, t=1, theta=0.2):
 	"""
 	Args:
-		N: number of virtual nodes
+		N: number of virtual high_nodes
 		gamma: input gain
 		eta: oscillation strength
 		tau: loop delay length
@@ -98,7 +98,7 @@ def Classification_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_w
 		beta: driver gain
 		t: timestep used to solve diffeq
 		power: exponent for MG equation
-		theta: distance between virtual nodes
+		theta: distance between virtual high_nodes
 
 
 	Returns:
@@ -122,6 +122,46 @@ def Classification_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_w
 
 	return [clf.score(new_Xs[1], y_test), np.mean(margin(clf, X_test))]
 
+def Sin_Test(N=400, eta=0.35, gamma=0.05, tau=400, bits=np.inf, num_waves=1000, test_size=0.1,
+						preload=False, write=False, mask=0.1, activate='mg', beta=1.0, power=1, t=1, theta=0.2):
+	"""
+	Args:
+		N: number of virtual high_nodes
+		gamma: input gain
+		eta: oscillation strength
+		tau: loop delay length
+		bits: bit precision
+		preload: preload time-series data
+		write: save created time-series data
+		mask: amplitude of mask values
+		activate: activation function to be used (sin**2,tanh,mg)
+		beta: driver gain
+		t: timestep used to solve diffeq
+		power: exponent for MG equation
+		theta: distance between virtual high_nodes
+
+
+	Returns:
+		Accuracy of Ridge Model on Testing Data
+	"""
+	X_train, X_test, y_train, y_test = make_training_testing_set(num_waves=num_waves, test_percent=test_size,
+																 preload=preload, write=write)
+
+	m = np.array([random.choice([-mask, mask]) for _ in range(N)])
+
+	# Instantiate Reservoir, feed in training and prediction data sets
+	r1 = DelayReservoir(N=N, eta=eta, gamma=gamma, theta=theta, beta=beta, tau=tau, power=power)
+	Xs = [X_train, X_test]
+	new_Xs = [[], []]
+	for k, data in enumerate(Xs):
+		for idx in tqdm(range(len(data))):
+			new_Xs[k].append(np.array(r1.calculate(data[idx], m, t, activate)))
+	new_Xs = np.array(new_Xs)
+
+	clf = RidgeClassifier(alpha=0)
+	# clf.fit(new_Xs[0], y_train)
+	return new_Xs, clf, X_train, X_test, y_train, y_test, m
+
 
 def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R", beta=1.0, fudge=1.0,
 													num_waves=1000, test_size=0.1, plot=True):
@@ -132,7 +172,7 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R", beta=
 		activation : "wright", "mg", "hayes" (in the future)
 		eta : term that multiplies the delayed portion
 		max_Tau : the maximum tau for some given k (found through matlab program)
-		theta : time spacing between nodes
+		theta : time spacing between high_nodes
 		type: "R" tests the model with regression; "C" tests the model with classification
 
 	Returns:
@@ -195,20 +235,20 @@ def run_test(eta, max_Tau, gamma, theta=0.2, activation="hayes", type="R", beta=
 ####################
 
 
-#### General Test for NARMA_Test ####
-# NARMA_Test(
-#     test_length = 800,
-#     train_length = 3200,
-#     gamma = 0.48707341674880045,
-#     plot = False,
-#     N = 317,
-#     eta = 0.9615229252495553
-#     bits = np.inf,
-#     preload = False,
-#     beta = 0.408835328209339, 
-#     tau = x,
-#     activate = 'hayes',
-#     theta = theta
-#     )
+NARMA_Test(
+	test_length=800,
+	train_length=3200,
+	gamma=0.1007341674880045,
+	plot=False,
+	N=509,
+	eta=0.515229252495553,
+	preload=False,
+	beta=1.00435328209339,
+	tau=600,
+	activate='mg',
+	theta=0.2034,
+	power=1.0,
+	cv=False
+	)
 
-print(run_test(eta=0.35, max_Tau=400, gamma=0.5, activation='hayes', type="C"))
+

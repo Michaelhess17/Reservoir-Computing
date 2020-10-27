@@ -1,35 +1,33 @@
 import numpy as np
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.linear_model import Ridge, ElasticNetCV
-from sklearn.utils.testing import ignore_warnings
+from sklearn.linear_model import Ridge
 
 from Delay_Reservoir import DelayReservoir
-from helper_files import load_NARMA
+from helper_files import load_NARMA, cross_validate
 
 
-@ignore_warnings(category=ConvergenceWarning)
-def cross_validate(l1_ratios, x, x_test, target):
-	"""
-	Manual corss-validation, ie choosing optimal ridge parameter
-
-	Args:
-		alphas: ridge parameters to validate
-		x: training data
-		x_test: validation data
-		target: correct labels for training/validation
-
-	Returns:
-		best_nrmse: lowest validation NRMSE found
-		best_prediction: prediction with lowest validation NRMSE
-		best_input: training prediction with lowest validation NRMSE
-	"""
-	clf = ElasticNetCV(n_alphas=1000, l1_ratio=l1_ratios, n_jobs=-1)
-	clf.fit(x, target[:len(x)])
-	y_test = clf.predict(x_test)
-	y_input = clf.predict(x)
-	NRMSE = np.sqrt(np.mean(np.square(y_test[50:] - target[len(x) + 50:])) / np.var(target[len(x) + 50:]))
-
-	return NRMSE, y_test, y_input, clf
+# @ignore_warnings(category=ConvergenceWarning)
+# def cross_validate(l1_ratios, x, x_test, target):
+# 	"""
+# 	Manual corss-validation, ie choosing optimal ridge parameter
+#
+# 	Args:
+# 		alphas: ridge parameters to validate
+# 		x: training data
+# 		x_test: validation data
+# 		target: correct labels for training/validation
+#
+# 	Returns:
+# 		best_nrmse: lowest validation NRMSE found
+# 		best_prediction: prediction with lowest validation NRMSE
+# 		best_input: training prediction with lowest validation NRMSE
+# 	"""
+# 	clf = ElasticNetCV(n_alphas=1000, l1_ratio=l1_ratios, n_jobs=-1)
+# 	clf.fit(x, target[:len(x)])
+# 	y_test = clf.predict(x_test)
+# 	y_input = clf.predict(x)
+# 	NRMSE = np.sqrt(np.mean(np.square(y_test[50:] - target[len(x) + 50:])) / np.var(target[len(x) + 50:]))
+#
+# 	return NRMSE, y_test, y_input, clf
 
 
 class ModifiedDelayRC(DelayReservoir):
@@ -79,15 +77,15 @@ class ModifiedDelayRC(DelayReservoir):
 
 		return M_x, J, X_lag
 
-	def NARMA_Test(self, test_length=500, train_length=500,
+	def NARMA_Test(self, test_length=500, train_length=5000,
 	               plot=False, N=400, eta=0.4, gamma=0.05, tau=400, fudge=1.0,
-	               preload=True, write=False, mask=0.1, activate='mg',
+	               preload=False, write=False, mask=0.1, activate='mg',
 	               cv=True, beta=1.0, t=1, theta=0.2, power=1):
 		"""
 		Args:
 			test_length: length of testing data
 			train_length: length of training data
-			N: number of virtual nodes
+			N: number of virtual high_nodes
 			plot: display calculated time series
 			gamma: input gain
 			eta: oscillation strength
@@ -98,7 +96,7 @@ class ModifiedDelayRC(DelayReservoir):
 			cv: perform leave-one-out cross validation
 			beta: driver gain
 			t: timestep used to solve diffeq,
-			theta: distance between virtual nodes in time
+			theta: distance between virtual high_nodes in time
 
 		Returns:
 			NRMSE: Normalized Root Mean Square Error
@@ -118,9 +116,8 @@ class ModifiedDelayRC(DelayReservoir):
 
 		# Train using Ridge Regression with hyperparameter tuning
 		if cv:
-			alphas = np.logspace(-100, 5, 1000),
-			NRMSE1, y_test1, y_input1, clf1 = cross_validate(l1_ratios=np.linspace(-3, 3, 100), x=x1, x_test=x_test1,
-			                                                 target=target)
+			alphas = np.logspace(-100, 1, 100)
+			NRMSE1, y_test1, y_input1, clf1 = cross_validate(alphas=alphas, x=x1, x_test=x_test1, target=target)
 			# res1 = np.linalg.norm(target[50+train_length:] - y_test1[50:]) ** 2
 			# ssr = np.sum((target[50+train_length:] - y_test1[50:]) ** 2)
 			#
@@ -141,8 +138,7 @@ class ModifiedDelayRC(DelayReservoir):
 			sst = np.sum((target[50:train_length] - np.mean(target[50:train_length])) ** 2)
 
 			r2_1 = 1 - (ssr / sst)
-			NRMSE2, y_test2, y_input2, clf2 = cross_validate(l1_ratios=np.linspace(-3, 3, 100), x=x2, x_test=x_test2,
-			                                                 target=target)
+			NRMSE2, y_test2, y_input2, clf2 = cross_validate(alphas=alphas, x=x2, x_test=x_test2, target=target)
 			res2 = np.linalg.norm(target[50:train_length] - y_input2[50:]) ** 2
 			ssr = np.sum((target[50:train_length:] - y_input2[50:]) ** 2)
 
@@ -181,7 +177,7 @@ def Values_Test(test_length=800, train_length=800, N=400, eta=0.4, tau=400,
 		test_length: length of testing data
 		train_length: length of training data
 		a: ridge regression parameter
-		N: number of virtual nodes
+		N: number of virtual high_nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -201,9 +197,19 @@ def Values_Test(test_length=800, train_length=800, N=400, eta=0.4, tau=400,
 	u, m, _ = load_NARMA(preload, train_length, test_length, mask, N)
 
 	# Instantiate Reservoir, feed in training and predictiondatasets
-	r1 = ModifiedDelayRC(N=N, eta=eta, gamma=gamma, theta=theta,
-	                     beta=beta, tau=tau, power=power, fudge=fudge)
-	M_x, J, X_lag = r1.calculate(u[:train_length], m, t, activate)
+	if type(activate) != list:
+		r1 = ModifiedDelayRC(N=N, eta=eta, gamma=gamma, theta=theta,
+		                     beta=beta, tau=tau, power=power, fudge=fudge)
+		M_x, J, X_lag = r1.calculate(u[:train_length], m, t, activate)
+	else:
+		M_x, J, X_lag = [], [], []
+		r1 = ModifiedDelayRC(N=N, eta=eta, gamma=gamma, theta=theta,
+		                     beta=beta, tau=tau, power=power, fudge=fudge)
+		for activation in activate:
+			a, b, c = r1.calculate(u[:train_length], m, t, activation)
+			M_x.append(a)
+			J.append(b)
+			X_lag.append(c)
 	# plt.figure(2)
 	# plt.scatter(M_x.flatten(), J.flatten(), s=.01)
 	return M_x, J, X_lag
@@ -215,14 +221,20 @@ def Values_Test(test_length=800, train_length=800, N=400, eta=0.4, tau=400,
 # # plt.figure(2)
 # plt.plot(M_x2.flatten() - M_x1.flatten())
 # plt.show()
-if __name__ == '__main__':
-	MRC = ModifiedDelayRC()
-	# NRMSE1, NRMSE2, x1, x2, target, x_test1, x_test2, y_test1, y_test2, res1, res2, r2_1, r2_2, clf1, clf2 \
-	# = MRC.NARMA_Test()
-
-	results1, results2 = MRC.NARMA_Test()
-
-# plt.plot(M_x1)
+# if __name__ == '__main__':
+# 	MRC = ModifiedDelayRC()
+# 	NRMSE1, NRMSE2, x1, x2, target, x_test1, x_test2, y_test1, y_test2, res1, res2, r2_1, r2_2, clf1, clf2 \
+# 	= MRC.NARMA_Test()
+#
+# 	fs = 10
+# 	f, Cxy = signal.coherence(x1[:,64], x1[:,212], fs, nperseg=100)
+# 	plt.plot(f, Cxy)
+# 	plt.xlabel('frequency [Hz]')
+# 	plt.ylabel('Coherence')
+# 	plt.show()
+# 	# results1, results2 = MRC.NARMA_Test()
+#
+# plt.plot(x1)
 # plt.xlabel('Time step')
 # plt.ylabel('Node response')
 # plt.title('Responses of Nodes for MG')
