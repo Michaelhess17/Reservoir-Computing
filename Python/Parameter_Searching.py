@@ -1,19 +1,11 @@
 import numpy as np
 import seaborn as sns
-from Delay_Reservoir import DelayReservoir
-from RC_test import run_test, NARMA_Test
 from hyperopt import tpe, hp, fmin
 from matplotlib import pyplot as plt
 
-from tabulate import tabulate
+from Delay_Reservoir import DelayReservoir
+from RC_test import run_test, NARMA_Test
 
-import ray
-from ray import tune
-from ray.tune.schedulers import AsyncHyperBandScheduler
-from ray.tune.suggest.hyperopt import HyperOptSearch
-
-from Modified_Delay_Reservoir import mod_Delay_Res
-from Hayes_Param import mod_NARMA_Test
 
 
 def wright_grid_search(max_Tau=9.992, wright_k=-0.15, eta=0.05, theta=0.2, gamma=0.05, parameter_searched="theta",
@@ -98,20 +90,13 @@ def mg_hayes_comp():
 
 	### MG portion, collect output
 	activate = 'mg'
-	np.random.seed(10)			# Reset the seed
-	mg_N = 509			# # o' nodes for optimal MG performance
-	r1 = mod_Delay_Res(N=mg_N, eta=0.94, gamma=0.28, theta=0.834, \
-						beta=0.74, tau=mg_N)
-	m = np.random.choice([0.1,-0.1], [1,mg_N])			# Tailor the mask to the number of nodes
-	m1 = m.reshape(mg_N,)
-	x_mg, vn_mg = r1.calculate(u, m1, bits, t, activate, no_act_res=True)  # Takes the actual output
 
+	r1 = DelayReservoir(N=400, eta=1, gamma=0.05, theta=0.2, beta=1, tau=400)
+	x_mg, vn_mg = r1.calculate(u[:train_length], m, bits, t, activate, no_act_res=True)  # Takes the actual output
+	# x_mg_vn = r1.calculate(u[:train_length], m, bits, t, activate)[1]
 
-	### Hayes portion, collect output
-	np.random.seed(10)			# Reset the seed
-	hayes_N = 400			# Redefine the # o' Nodes for optimal Hayes
-	r1 = mod_Delay_Res(N=hayes_N, eta=0.401, gamma=0.531, theta=0.2, \
-						beta=0.7, tau=hayes_N)
+	# Hayes portion, collect output
+
 	activate = 'hayes'
 	m = np.random.choice([0.1,-0.1], [1,hayes_N])
 	m = m.reshape(hayes_N,)
@@ -161,7 +146,6 @@ def mg_hayes_comp():
 	plt.xlabel("nth NARMA Input")
 	plt.title("Hayes Ouput given NARMA Input (ind. optimal param)")
 	plt.legend()
-
 	plt.show()
 
 def ml_test_hayes(param):
@@ -170,8 +154,9 @@ def ml_test_hayes(param):
 	Declares variables to hyperopt.
 	Returns the mean NRMSE of 3 NARMA10 tasks
 	"""
-	gamma, eta, k1 = \
-		param['gamma'], param['eta'], param['k1'], # param['beta'], param['theta'],
+	gamma, eta, beta, hayes_param = \
+		param['gamma'], param['eta'], param['beta'], param['hayes_p']
+
 
 	N = 400  # Number of Nodes
 
@@ -199,12 +184,11 @@ def hyperopt_grad_hayes():
 		fn=ml_test_hayes,
 		space={
 			# 'x': hp.randint('x',800),
-			'gamma': hp.uniform('gamma', 0.01, 0.5),
-			'eta': hp.uniform('eta', 0, 10),
-			# 'N': hp.randint('N',800),
-			# 'theta': hp.uniform('theta', 0, 1),
-			# 'beta': hp.uniform('beta', 0, 1),
-			'k1': hp.uniform('hayes_param', 0, 10)
+			'gamma': hp.uniform('gamma', 0.01, 2),
+			'eta': hp.uniform('eta', 0.01, 0.99),
+			'beta': hp.uniform('beta', 0, 1),
+			'hayes_p': hp.uniform('hayes_p', 0, 1)
+
 		},
 		algo=tpe.suggest,
 		max_evals=100
@@ -229,7 +213,6 @@ def ml_test_wright(param):
 		plot=False,
 		N=N,
 		eta=k,
-		bits=np.inf,
 		preload=False,
 		beta=beta,
 		tau=N,
@@ -247,7 +230,51 @@ def hyperopt_grad_wright():
 		space={
 			# 'x': hp.randint('x',800),
 			'gamma': hp.uniform('gamma', 0.01, 2),
-			'eta': hp.uniform('k', 0, 1),
+			'eta': hp.uniform('eta', 0.01, 0.99),
+			'beta': hp.uniform('beta', 0, 1),
+			'hayes_p': hp.uniform('hayes_p', 0, 1)
+		},
+		algo=tpe.suggest,
+		max_evals=100
+	)
+
+	print(best)
+
+def ml_test_mg(param):
+	"""
+	Sets up 'function' to minimize.
+	Declares variables to hyperopt.
+	Returns the mean NRMSE of 3 NARMA10 tasks
+	"""
+	gamma, eta, N, theta, beta = \
+		param['gamma'], param['eta'], param['N'], \
+		param['theta'], param['beta']
+
+	return np.mean([NARMA_Test(
+		test_length=800,
+		train_length=3200,
+		gamma=gamma,
+		plot=False,
+		N=N,
+		eta=eta,
+		bits=np.inf,
+		preload=False,
+		beta=beta,
+		tau=N,
+		activate='mg',
+		theta=theta
+	) for _ in range(3)])
+
+def hyperopt_grad_mg():
+	"""
+	calls the fmin
+	"""
+	best = fmin(
+		fn=ml_test_mg,
+		space={
+			# 'x': hp.randint('x',800),
+			'gamma': hp.uniform('gamma', 0.01, 2),
+			'eta': hp.uniform('eta', 0, 1),
 			'N': hp.randint('N', 800),
 			'theta': hp.uniform('theta', 0.0001, 1),
 			'beta': hp.uniform('beta', 0, 1)
@@ -366,13 +393,13 @@ def ray_hayes():
 # ray_hayes()
 
 #### mg_hayes_comp tests ####
-mg_hayes_comp()
+# mg_hayes_comp()
 
 #### Grid search tests ####
 # wright_grid_search(parameter_searched="eta_gamma", activation = "hayes")
 
 #### Hyperopt Tests ####
 # hyperopt_grad_wright()
+
 # hyperopt_grad_hayes()
 # hyperopt_grad_mg()
-

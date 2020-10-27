@@ -1,5 +1,8 @@
-from Delay_Reservoir import DelayReservoir
+
 import numpy as np
+
+from Delay_Reservoir import DelayReservoir
+
 
 class mod_Delay_Res(DelayReservoir):
 	def __init__(self, k1 = 1, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, power = 1):

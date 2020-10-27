@@ -11,30 +11,30 @@ import numpy as np
 ##########################################################################
 
 class DelayReservoir():
-
 	"""
 	Class to perform Reservoir Computing using Delay-Based Architecture
 	"""
-	
-	def __init__(self, N = 400, eta = 0.4,gamma = 0.05,theta = 0.2,beta = 1.0,tau = 400, power = 1):
+
+	def __init__(self, N=400, eta=0.4, gamma=0.05, theta=0.2, beta=1.0, tau=400, fudge=1.0, power=1.0):
 		"""
 		Args:
 			N:  Number of Virtual Nodes
 			eta: Feedback gain
 			gamma: Input gain
+
 			theta: Distance between virtual nodes
 			beta: Driver gain 
 			tau: Ratio of loop length to node spacing for each loop
 		"""
-		
 		self.N = N
 		self.eta = eta
 		self.gamma = gamma
 		self.theta = theta
 		self.beta = beta
 		self.tau = tau
+		self.fudge = fudge
 		self.power = power
-
+    
 	def mask(self,u,m = None):
 		"""
 		Args:
@@ -44,21 +44,19 @@ class DelayReservoir():
 		Returns:
 			J: Multiplexed (masked) data
 		"""
-
-			
 		if len(m.shape) == 1:
-			
-			if m.all() == None:
-				m = np.array([random.choice([-0.1,0.1]) for i in range(self.N)])
-			
-			u = np.reshape(u,(-1,1))
-			m = np.reshape(m,(1,-1))
-			
-			return u@m
-		else:
-			return (m@u).T
 
-	def calculate(self,u,m,bits,t,act,no_act_res = False):
+			if not m.all():
+				m = np.array([random.choice([-0.1, 0.1]) for i in range(self.N)])
+
+			u = np.reshape(u, (-1, 1))
+			m = np.reshape(m, (1, -1))
+
+			return u @ m
+		else:
+			return (m @ u).T
+
+	def calculate(self, u, m, t, act, no_act_res=False):
 		"""
 		Calculate reservoir state over duration u
 
@@ -73,9 +71,7 @@ class DelayReservoir():
 
 		Returns:
 			M_x: matrix of reservoir history
-		"""
-		
-		
+    """
 		#Reshape input data with mask
 
 		J = self.mask(u,m)
@@ -157,5 +153,4 @@ class DelayReservoir():
 			return lambda x: x/(1+round(float(np.random.rand(1)), 3))
 		else:
 			raise Exception('Not a valid activation function!')
-
 

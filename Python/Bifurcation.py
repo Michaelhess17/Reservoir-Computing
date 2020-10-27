@@ -4,6 +4,7 @@ __author__ = "Philip Jacobson"
 __email__ = "philip_jacobson@berkeley.edu"
 
 import numpy as np
+
 from Delay_Reservoir import DelayReservoir
 from helper_files import load_NARMA
 
@@ -14,8 +15,8 @@ from helper_files import load_NARMA
 ############################################################################
 
 class ModifiedDelayRC(DelayReservoir):
-	def __init__(self, eta=0.9, gamma=0, beta=1.0, theta=0.2, tau=400, N=400, power=7):
-		super().__init__(eta=0.9, gamma=0, beta=1.0, theta=0.2, tau=400, N=400, power=7)
+	def __init__(self, eta=0.9, gamma=0.0, beta=1.0, theta=0.2, tau=400, N=400, power=7):
+		super().__init__(eta=0.9, gamma=0.0, beta=1.0, theta=0.2, tau=400, N=400, power=7)
 		self.eta = eta
 		self.gamma = gamma
 		self.beta = beta
@@ -69,7 +70,7 @@ class ModifiedDelayRC(DelayReservoir):
 
 		return M_x
 
-
+@staticmethod
 def Bif_Test(test_length=800, train_length=800, N=400, eta=0.4,  tau=400,
 			   bits=np.inf, preload=False, write=False, mask=0.1, activate='mg',  beta=1.0, t=1, theta=0.2, hayes_p=1,power=1):
 	"""
@@ -77,7 +78,7 @@ def Bif_Test(test_length=800, train_length=800, N=400, eta=0.4,  tau=400,
 		test_length: length of testing data
 		train_length: length of training data
 		a: ridge regression parameter
-		N: number of virtual nodes
+		N: number of virtual high_nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -113,7 +114,7 @@ def run_test():
 		activation : "wright", "mg", "hayes" (in the future)
 		eta : term that multiplies the delayed portion
 		maxTau : the maximum tau for some given k (found through matlab program)
-		theta : time spacing between nodes
+		theta : time spacing between high_nodes
 
 	Returns:
 		output: NRMSE of Narma task

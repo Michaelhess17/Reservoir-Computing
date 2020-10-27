@@ -1,17 +1,12 @@
 
 import numpy as np
-import seaborn as sns
-from Delay_Reservoir import DelayReservoir
-from RC_test import run_test, NARMA_Test
-from hyperopt import tpe, hp, fmin
 from matplotlib import pyplot as plt
-
-from helper_files import cross_validate, make_training_testing_set, load_NARMA, \
-	plot_func, write_func, margin
 from sklearn.linear_model import Ridge
-from sklearn.linear_model import RidgeClassifier
 
 from Modified_Delay_Reservoir import mod_Delay_Res, hayes_special_Delay_Res
+from helper_files import cross_validate, load_NARMA, \
+	plot_func, write_func
+
 
 """
 Intended to store parameter tweaks for Hayes 07/10/20 until able to merge this code with that in Parameter_Searching.py when Ray/Tune works
