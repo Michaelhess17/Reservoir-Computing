@@ -78,7 +78,7 @@ def Bif_Test(test_length=800, train_length=800, N=400, eta=0.4,  tau=400,
 		test_length: length of testing data
 		train_length: length of training data
 		a: ridge regression parameter
-		N: number of virtual nodes
+		N: number of virtual high_nodes
 		plot: display calculated time series
 		gamma: input gain
 		eta: oscillation strength
@@ -114,7 +114,7 @@ def run_test():
 		activation : "wright", "mg", "hayes" (in the future)
 		eta : term that multiplies the delayed portion
 		maxTau : the maximum tau for some given k (found through matlab program)
-		theta : time spacing between nodes
+		theta : time spacing between high_nodes
 
 	Returns:
 		output: NRMSE of Narma task

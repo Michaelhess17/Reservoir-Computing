@@ -3,7 +3,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
-from sklearn.linear_model import ElasticNetCV
+from sklearn.linear_model import RidgeCV
 from sklearn.model_selection import train_test_split
 
 # from hyperopt import hp, tpe, fmin
@@ -67,7 +67,7 @@ def NARMA_Diverges(u):
 	return False
 
 
-def cross_validate(l1_ratios, x, x_test, target):
+def cross_validate(alphas, x, x_test, target):
 	"""
 	Manual corss-validation, ie choosing optimal ridge parameter
 
@@ -82,36 +82,28 @@ def cross_validate(l1_ratios, x, x_test, target):
 		best_prediction: prediction with lowest validation NRMSE
 		best_input: training prediction with lowest validation NRMSE
 	"""
-	# best_prediction = np.array([])
-	# best_nrmse = np.inf
-	# best_train = np.array([])
-	# best_model = None
-	# np.append(alphas, 0)
+	best_prediction = np.array([])
+	best_nrmse = np.inf
+	best_train = np.array([])
+	alphas[0] = 0
 	# for a in alphas:
-	# 	for ratio in l1_ratios:
-	# 		# clf = Ridge(alpha=a)
-	# 		clf = ElasticNetCV(alpha=a, l1_ratio=ratio)
-	# 		clf.fit(x, target[:len(x)])
-	# 		y_test = clf.predict(x_test)
-	# 		y_input = clf.predict(x)
-	# 		NRMSE = np.sqrt(np.mean(np.square(y_test[50:] - target[len(x) + 50:])) /
-	# 		                np.var(target[len(x) + 50:]))
-	#
-	# 		# Compare with previous best and update if better
-	# 		if (NRMSE < best_nrmse):
-	# 			best_nrmse = NRMSE
-	# 			best_prediction = y_test
-	# 			best_train = y_input
-	# 			best_model = clf
-
-	clf = ElasticNetCV(n_alphas=1000, l1_ratio=l1_ratios, max_iter=1e6, n_jobs=-1)
+	# clf = Ridge(alpha = a)
+	clf = RidgeCV(alphas=alphas, cv=3)  # Default max_iter = 1000
 	clf.fit(x, target[:len(x)])
 	y_test = clf.predict(x_test)
 	y_input = clf.predict(x)
-	NRMSE = np.sqrt(np.mean(np.square(y_test[50:] - target[len(x) + 50:])) /
-							np.var(target[len(x) + 50:]))
 
-	return NRMSE, y_test, y_input, clf
+	NRMSE = np.sqrt(np.mean(np.square(y_test[50:] - target[len(x) + 50:])) / \
+	                np.var(target[len(x) + 50:]))
+
+		# Compare with previous best and update if better
+	if (NRMSE < best_nrmse):
+		# optimal_alpha = a
+		best_nrmse = NRMSE
+		best_prediction = y_test
+		best_train = y_input
+
+	return best_nrmse, best_prediction, best_train, clf
 
 
 def make_training_testing_set(num_waves=1000, test_percent=0.1, preload=False, write=False):
@@ -120,7 +112,7 @@ def make_training_testing_set(num_waves=1000, test_percent=0.1, preload=False, w
 		sin = lambda x, theta: np.sin(theta * x)
 		square = lambda x, theta: np.sign(theta * x)
 		sawtooth = lambda x, theta: signal.sawtooth(theta * x)
-		t = np.linspace(-5, 5, 500)
+		t = np.linspace(-2, 2, 100)
 		waves = []
 		y = []
 		funcs = [sin, sawtooth, square]
@@ -169,6 +161,12 @@ def load_NARMA(preload, train_length=800, test_length=800, mask=0.1, N=400):
 		u = np.array(u)
 		m = np.array(m)
 		m = m[:N]  # Able to do preloaded data for all sorts of node sizes
+
+		if N > 400:  # If you want more than 400 high_nodes:
+			np.random.seed(10)  # Resets the seed so behaves the same
+			m = np.random.choice([0.1, -0.1], [1, N])  # Tailor the mask to the number of high_nodes
+			m = m.reshape(N, )
+
 	# Randomly initialize u and m
 	else:
 		u = np.random.rand(train_length + test_length) / 2.

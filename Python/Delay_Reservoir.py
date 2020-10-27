@@ -21,7 +21,7 @@ class DelayReservoir():
 			N:  Number of Virtual Nodes
 			eta: Feedback gain
 			gamma: Input gain
-			theta: Distance between virtual nodes
+			theta: Distance between virtual high_nodes
 			beta: Driver gain
 			tau: Ratio of loop length to node spacing for each loop
 		"""
